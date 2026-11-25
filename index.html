@@ -200,7 +200,14 @@ function renderLineNotices(){
  const kind=mode==='new'?periodName+'新品':'補貨';
  const warnings=[],sections=[];
  for(const store of stores){
-  const idx=stores.indexOf(store),config=lineDefs[store][batch];
+  const idx=stores.indexOf(store),base=lineDefs[store][batch];
+  const newSunZones={
+    信義:['1F倉庫'],西門:['4F倉庫','2F陳列'],ATT:['B1F倉庫','1F陳列'],
+    文心:['2F倉庫','1F陳列'],南西:['1F倉庫','1F陳列'],
+    光復:['2F倉庫'],民族:['1F倉庫','1F陳列'],
+    板橋:['1F倉庫','1F陳列'],大隆:['2F倉庫']
+  };
+  const config=mode==='new'?{...base,zones:newSunZones[store]}:base;
   const total=rows.reduce((a,r)=>a+(r.qty[idx]||0),0);
   const zones=Object.fromEntries(config.zones.map(z=>[z,0]));
   let uncertain=false;
