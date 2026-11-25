@@ -118,7 +118,7 @@ setMode('restock');
     items.forEach(v=>lines.push([v.sku,v.qty,'','']));
    }
    const total=items.reduce((a,b)=>a+b.qty,0);
-   const file='PA'+store+'店_'+zone+'_'+safeName(period)+(mode==='new'?'新品':'補貨')+'.xlsx';
+   const file=(store==='ATT'?'PA ATT':'PA'+store)+'店_'+zone+'_'+safeName(period)+(mode==='new'?'新品':'補貨')+'.xlsx';
    entries[file]=new Uint8Array(); // populated by async Blob extraction below
    totals.push({file,blob:xlsxCells(tab,lines),total,items:items.length});
   }
