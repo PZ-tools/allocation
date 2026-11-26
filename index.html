@@ -75,7 +75,7 @@
 #work.new-workbench > .card > .tablebox td.sticky-code,
 #work.new-workbench > .card > .tablebox td.sticky-color,
 #work.new-workbench > .card > .tablebox td.sticky-size{box-shadow:1px 0 0 #e5dcd4}
-</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.12</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
+</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.13</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">① 補貨</button><button id="modeNew" onclick="setMode('new')">② 新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub"><b>上傳請移除機密資訊，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數</b></div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div></section>
 <section id="settings" class="card hide"><h2 id="settingsTitle">設定</h2><p class="sub">補貨與新品設定分開保存於目前瀏覽器，沒有同步至雲端。</p><div class="row" id="settingFields"></div><h3>配貨優先順序（最高到最低）</h3><div id="priority"></div><div class="row"><button class="primary" onclick="saveSettings()">儲存設定</button><button onclick="setStep('home')">返回</button></div></section>
@@ -2282,9 +2282,10 @@ function newWorkbenchRender(){
   '<button onclick="setStep(\'home\')">重新匯入</button>';
  const controls=document.getElementById('newControls');
  if(controls){
-  const oldOpen=controls.querySelector('details')?.open;
-  if(oldOpen!==undefined)newZeroExpanded=oldOpen;
-  controls.innerHTML=newZeroMarkup();
+  // Keep the existing expanded selector DOM in place: rebuilding it on each
+  // checkbox change displaced the page and the selector's own scroll position.
+  if(!controls.querySelector('details[data-new-zero]'))controls.innerHTML=newZeroMarkup();
+  newSyncZeroControls(controls);
  }
  newRenderStoreJump(activeStores);
  const colWidths=[105,65,45,190,132,65,45,72,55,65];
@@ -2385,7 +2386,11 @@ function newApplySnapshot(savedState){
  });
  zeroReasons=state.reasons;
 }
-function newResetHistory(){newHistory=[];newInitialSnapshot=null;newZeroExpanded=false}
+function newResetHistory(){
+ newHistory=[];newInitialSnapshot=null;newZeroExpanded=false;
+ const controls=document.getElementById('newControls');
+ if(controls)controls.innerHTML='';
+}
 function newEnsureInitial(){
  if(mode==='new'&&step==='work'&&newInitialSnapshot===null){
   newInitialSnapshot=newSnapshot();newHistory=[];
@@ -2409,20 +2414,43 @@ function newCompareNineCode(x,y){
 }
 function newZeroMarkup(){
  const groups=[...new Set(rows.map(r=>r.spu))].sort(newCompareNineCode);
- return '<details '+(newZeroExpanded?'open':'')+' ontoggle="newZeroExpanded=this.open">'+
+ return '<details data-new-zero '+(newZeroExpanded?'open':'')+' ontoggle="newZeroExpanded=this.open">'+
   '<summary style="cursor:pointer;font-weight:700;padding:11px 10px">當次新品歸零勾選（'+groups.length+' 組貨號）</summary>'+
   '<div class="tablebox" style="max-height:42vh"><table class="zero-table" style="min-width:550px"><thead>'+
   '<tr><th>9 碼貨號</th><th>原因</th><th>尺寸</th></tr></thead><tbody>'+
   groups.map(code=>{
    const group=rows.map((r,i)=>({r,i})).filter(x=>x.r.spu===code);
    const reason=zeroReasons[code]||'',encoded=encodeURIComponent(code);
-   return '<tr><td><label><input type="checkbox" '+(group.every(({r})=>r.blocked)?'checked':'')+
-    ' onchange="newToggleZeroGroup(\''+encoded+'\',this.checked)"> <b>'+esc(code)+'</b></label></td>'+
-    '<td><select onchange="newSetZeroReason(\''+encoded+'\',this.value)"><option value="">選擇原因</option>'+
+   return '<tr><td><label><input type="checkbox" data-zero-group="'+esc(code)+'" '+(group.every(({r})=>r.blocked)?'checked':'')+
+    ' onchange="newToggleZeroGroup(\''+encoded+'\',this.checked)"> <b>'+esc(code)+'</b> <span data-zero-group-mark="'+esc(code)+'">'+(group.some(({r})=>r.blocked)?'⛔':'')+'</span></label></td>'+
+    '<td><select data-zero-reason="'+esc(code)+'" onchange="newSetZeroReason(\''+encoded+'\',this.value)"><option value="">選擇原因</option>'+
     ['尚未入庫','官網預購','分批到貨'].map(v=>'<option value="'+v+'" '+(v===reason?'selected':'')+'>'+v+'</option>').join('')+
     '</select></td><td>'+group.map(({r,i})=>'<label class="pill"><input type="checkbox" '+(r.blocked?'checked':'')+
-    ' onchange="newToggleZeroSku('+i+',this.checked)"> '+esc(r.size||'尺寸待確認')+'</label>').join(' ')+'</td></tr>';
+    ' data-zero-sku="'+i+'" onchange="newToggleZeroSku('+i+',this.checked)"> '+esc(r.size||'尺寸待確認')+' <span data-zero-sku-mark="'+i+'">'+(r.blocked?'⛔':'')+'</span></label>').join(' ')+'</td></tr>';
   }).join('')+'</tbody></table></div></details>';
+}
+function newSyncZeroControls(controls){
+ const details=controls.querySelector('details[data-new-zero]');
+ if(!details)return;
+ newZeroExpanded=details.open;
+ controls.querySelectorAll('input[data-zero-group]').forEach(el=>{
+  const code=el.dataset.zeroGroup,group=rows.filter(r=>r.spu===code);
+  el.checked=group.length>0&&group.every(r=>r.blocked);
+ });
+ controls.querySelectorAll('input[data-zero-sku]').forEach(el=>{
+  const row=rows[Number(el.dataset.zeroSku)];
+  el.checked=!!row?.blocked;
+ });
+ controls.querySelectorAll('[data-zero-group-mark]').forEach(el=>{
+  el.textContent=rows.some(r=>r.spu===el.dataset.zeroGroupMark&&r.blocked)?'⛔':'';
+ });
+ controls.querySelectorAll('[data-zero-sku-mark]').forEach(el=>{
+  el.textContent=rows[Number(el.dataset.zeroSkuMark)]?.blocked?'⛔':'';
+ });
+ controls.querySelectorAll('select[data-zero-reason]').forEach(el=>{
+  const value=zeroReasons[el.dataset.zeroReason]||'';
+  if(el.value!==value)el.value=value;
+ });
 }
 function newSetZeroReason(encoded,value){
  const code=decodeURIComponent(encoded);
@@ -2486,9 +2514,19 @@ setMode=function(value){newResetHistory();oldMode0811(value)};
 
 const newWorkbenchOldRender=render;
 render=function(){
- newWorkbenchOldRender();
- if(mode==='new'&&step==='work')newWorkbenchRender();
- else document.getElementById('work')?.classList.remove('new-workbench');
+ if(mode==='new'&&step==='work'){
+  const grid=document.querySelector('#work.new-workbench > .card > .tablebox');
+  const x=grid?.scrollLeft??0,y=grid?.scrollTop??0,pageY=window.scrollY;
+  // New-arrivals rendering is complete in newWorkbenchRender. Running the old
+  // preview first recreates the selector and makes the page jump after clicking.
+  newWorkbenchRender();
+  const current=document.querySelector('#work.new-workbench > .card > .tablebox');
+  if(current){current.scrollLeft=x;current.scrollTop=y}
+  if(Math.abs(window.scrollY-pageY)>1)window.scrollTo(window.scrollX,pageY);
+ }else{
+  newWorkbenchOldRender();
+  document.getElementById('work')?.classList.remove('new-workbench');
+ }
 };
 const newWorkbenchOldApprove=approve;
 approve=function(){
