@@ -26,11 +26,22 @@ function guideSetDate(value){
  if(Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==value)return;
  if(guided.date===value)return;
  guided.date=value;guided.dateConfirmed=false;
- // Changing the batch date invalidates every previous demand selection.
- for(const file of importState.demand){file.selected='';file.entries=[];file.autoSelected=false;file.issue='請重新配對本次日期';}
+ // Changing the batch date invalidates earlier selections; retain uploaded files.
+ for(const file of importState.demand){file.selected='';file.entries=[];file.autoSelected=false;file.issue=file.book?'日期已變更，請確認後重新配對':'日期已變更';}
  guided.stage=1;guided.error='';guideRender();
 }
-function guideConfirmDate(){guided.dateConfirmed=true;guided.error='';guideRender()}
+async function guideConfirmDate(){
+ if(guided.busy)return;
+ guided.busy=true;guided.error='';
+ try{
+  for(const file of importState.demand){
+   if(file.book)await guideAutoChoose(file);
+   else{file.selected='0';file.entries=file.sheets?.[0]?.entries||file.entries;file.issue='';}
+  }
+  guided.dateConfirmed=true;
+ }catch(err){guided.error='重新配對失敗：'+err.message}
+ finally{guided.busy=false;guideRender()}
+}
 
 function guideCode(n){return /^[A-Z0-9]{9}$/i.test(String(n||'').trim())?String(n).trim().toUpperCase():''}
 function guide9(row,head,barcode){
@@ -188,7 +199,7 @@ function guideDemandIssues(){
  for(const f of files){
   if(f.issue)warnings.push(f.name+'：'+f.issue);
   else if(f.selected==='')warnings.push(f.name+' 尚未選擇工作表');
-  else if(mode==='restock'&&(!guideSameDate(f.sheets?.[Number(f.selected)]?.name)||!guideBrandMatch(f.sheets?.[Number(f.selected)]?.name,f.name)))warnings.push(f.name+'：工作表不符合本次補貨日期／PAZZO 品牌');
+  else if(mode==='restock'&&f.book&&(!guideSameDate(f.sheets?.[Number(f.selected)]?.name)||!guideBrandMatch(f.sheets?.[Number(f.selected)]?.name,f.name)))warnings.push(f.name+'：工作表不符合本次補貨日期／PAZZO 品牌');
  }
  for(const r of selected){const k=[r.sku,r.store,r.zone].join('|');if(keys.has(k))warnings.push('重複需求：'+r.sku+'／'+r.store+(r.zone?'／'+r.zone:''));keys.add(k)}
  return warnings;
@@ -352,7 +363,7 @@ selectImportedSheet=async function(kind,index,value){
     for(let i=0;i<file.book.tabs.length;i++)file.entries.push(...await guideReadSheet(file,i));
    }else if(value!=='')file.entries=await guideReadSheet(file,Number(value));
   }else{file.entries=value==='all'?file.sheets.flatMap(s=>s.entries):value===''?[]:(file.sheets[Number(value)]?.entries||[])}
-  if(kind==='demand'&&mode==='restock'&&value!==''&&
+  if(kind==='demand'&&mode==='restock'&&file.book&&value!==''&&
     (!guideSameDate(file.sheets[Number(value)]?.name)||!guideBrandMatch(file.sheets[Number(value)]?.name,file.name))){
     file.issue='工作表與本次 '+guideMMDD()+' 補貨日期／品牌不符';
   }else file.issue='';
