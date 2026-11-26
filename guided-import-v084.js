@@ -236,7 +236,7 @@ function guideTabScore(tab,index,kind){
     best=Math.min(best,distance);
    }
   }
-  if(Number.isFinite(best))score+=Math.max(-50000,60000-best*1000);
+  if(Number.isFinite(best))score+=(best<=14?300000:best<=30?180000:0)-best*1000;
  }else if(/商品批次|庫存|現貨|工作表1/.test(compact))score+=100000;
  return score-index*0.01;
 }
