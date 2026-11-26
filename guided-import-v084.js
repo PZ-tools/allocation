@@ -159,6 +159,7 @@ function guideDemandIssues(){
 }
 function guideNext(target){
  if(target===2){
+  if(mode==='new'&&!newConfirmed){guideAlert('請先確認本次新品配貨門市');return}
   if(!importState.demand.some(f=>f.entries.length)||guideDemandIssues().length){guideAlert('請完成工作表選擇及需求核對');return}
  }
  if(target===3&&!guideList().length){guideAlert('尚無可查詢的 9 碼貨號');return}
@@ -190,7 +191,7 @@ function guideRender(){
  guideFileMarkup('demand')+
  '<p class="sub">'+(demand.length?'已辨識 '+demand.length+' 筆需求':'尚未匯入需求')+'</p>'+
  (errors.length?'<p class="warn">'+esc(errors.slice(0,3).join('；'))+'</p>':'')+
- '<button class="primary" onclick="guideNext(2)" '+(!demand.length||errors.length?'disabled':'')+'>確認需求並整理貨號 →</button>';
+ '<button class="primary" onclick="guideNext(2)" '+(!demand.length||errors.length||(mode==='new'&&!newConfirmed)?'disabled':'')+'>確認需求並整理貨號 →</button>';
  if(stage===2){
   guided.batch=Math.min(guided.batch,Math.max(0,count-1));
   const visible=codes.slice(guided.batch*100,(guided.batch+1)*100);
