@@ -6,7 +6,7 @@ function guideIsoDay(){
  const distance=(5-now.getDay()+7)%7;now.setDate(now.getDate()+distance);
  return [now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
 }
-guided.date=guideIsoDay();
+guided.date=mode==='new'?guideNewDay():guideIsoDay();
 function guideMMDD(){return guided.date.slice(5).replace('-','')}
 function guideSameDate(name){
  const digits=guideMMDD();
@@ -480,11 +480,9 @@ function guideMount(){
  if(!home||!panel)return;
  const wrapper=panel.parentElement;wrapper.style.display='none';
  const first=Array.from(home.querySelectorAll('.row')).find(x=>!x.closest('#newEntry')&&!x.closest('#importPanel'));
- if(first&&first.closest('#home')===home){
-  const tools=document.createElement('details');tools.className='guide-tools';
-  tools.innerHTML='<summary>測試工具</summary>';
-  tools.appendChild(first);home.appendChild(tools);
- }
+ // Guided import is the only user-facing entry point. Remove the obsolete
+ // sample/demo toolbar without altering its internal test functions.
+ if(first&&first.closest('#home')===home)first.remove();
  const area=document.createElement('div');area.id='guidedArea';area.className='guide-main';home.insertBefore(area,wrapper);
  const css=document.createElement('style');
  css.textContent='.guide-main{padding:16px 0}.guide-main h3{margin:16px 0 9px}.guide-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:12px 0 19px}.guide-steps>div{border-radius:8px;text-align:center;background:#f3f3f3;padding:9px 3px;font-size:13px;color:#888}.guide-steps .is-active{background:#202020;color:white}.guide-steps .is-done{color:#21704b;background:#e7f4ed}.guide-upload{border:1px solid #ccc;padding:12px;border-radius:9px;display:block;margin:10px 0}.guide-upload input{display:block;margin-top:8px;max-width:100%}.guide-file{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}.guide-file span:first-child{flex:1;min-width:190px;overflow-wrap:anywhere}.guide-file select{max-width:200px}.guide-batches{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.guide-copy{background:#f5f5f5;border:1px solid #dedede;border-radius:8px;padding:12px;max-height:150px;overflow:auto;white-space:normal;overflow-wrap:anywhere;line-height:1.8;font-size:13px;margin:12px 0}.guide-nav{display:flex;flex-wrap:wrap;gap:9px;justify-content:space-between;margin:16px 0}.guide-tools{margin-top:25px;font-size:12px;opacity:.8}.guide-main button:disabled{opacity:.4;cursor:not-allowed}';
