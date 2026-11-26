@@ -1,16 +1,62 @@
-/* Original-workbook export: files stay in browser memory and are never sent to GitHub. */
+/* 原始範本只儲存在本裝置瀏覽器的 IndexedDB，沒有任何上傳。 */
 const originalTemplateFiles = new Map();
-function inspectOriginalTemplates(event) {
-  originalTemplateFiles.clear();
-  for (const file of Array.from(event.target.files||[])) {
-    if(!/\.xlsx$/i.test(file.name))continue;
-    const key=/PA\s*信義店/.test(file.name)?'信義':(/PA\s*ATT店/i.test(file.name)?'ATT':null);
-    if(!key)continue;
-    const kind=/陳列/.test(file.name)?'display':'warehouse';
-    originalTemplateFiles.set(key+':'+kind,file);
-  }
-  const e=document.getElementById('templateInfo');
-  if(e)e.textContent=originalTemplateFiles.size?'已選擇：'+Array.from(originalTemplateFiles.values()).map(x=>x.name).join('、')+'。僅保存在此頁記憶體，不會傳至伺服器。':'未找到信義或 ATT 原始 Excel 範本。';
+const templateDbName = 'pz-allocation-local-templates-v1';
+let templateReadyPromise;
+function openTemplateDb(){
+ return new Promise((resolve,reject)=>{
+  if(!('indexedDB' in window)){reject(new Error('此瀏覽器不支援本機範本保存'));return}
+  const r=indexedDB.open(templateDbName,1);
+  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('templates'))db.createObjectStore('templates')};
+  r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+ });
+}
+function localTemplateOperation(type,key,value){
+ return openTemplateDb().then(db=>new Promise((resolve,reject)=>{
+  const tx=db.transaction('templates',type==='get'?'readonly':'readwrite');
+  const st=tx.objectStore('templates');
+  const req=type==='put'?st.put(value,key):type==='clear'?st.clear():st.get(key);
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error);
+  tx.oncomplete=()=>db.close();
+  tx.onerror=()=>{db.close();reject(tx.error)};
+ }));
+}
+function displayTemplateStatus(note=''){
+ const e=document.getElementById('templateInfo');if(!e)return;
+ const labels=[['信義:warehouse','信義實業・1F倉庫'],['ATT:warehouse','ATT美學・B1F倉庫'],['ATT:display','ATT美學・1F陳列']];
+ e.innerHTML='<b>本機範本狀態：</b>'+labels.map(([key,name])=>{
+  const f=originalTemplateFiles.get(key);return '<span class="pill">'+name+'：'+(f?'✓ 已保存':'尚未設定')+'</span>'
+ }).join('')+'<div class="sub">'+(note||'首次選取一次後會保存在目前裝置的瀏覽器，下次可直接使用；換裝置、無痕模式或清除網站資料可能需要重選。')+'</div>';
+}
+async function restoreOriginalTemplates(){
+ try{
+  const labels=['信義:warehouse','ATT:warehouse','ATT:display'];
+  for(const key of labels){const value=await localTemplateOperation('get',key);if(value instanceof Blob)originalTemplateFiles.set(key,value)}
+  displayTemplateStatus();
+ }catch(err){displayTemplateStatus('本機保存無法使用：本次可選取範本，但下次可能需重新選取。')}
+}
+templateReadyPromise=restoreOriginalTemplates();
+async function inspectOriginalTemplates(event){
+ await templateReadyPromise;
+ const input=event.target;const selected=Array.from(input.files||[]);
+ if(!selected.length)return;
+ let added=0,failed=[];
+ for(const file of selected){
+  if(!/\.xlsx$/i.test(file.name)){failed.push(file.name+'（非 xlsx）');continue}
+  const key=/PA\s*信義店/.test(file.name)?'信義':(/PA\s*ATT店/i.test(file.name)?'ATT':null);
+  if(!key){failed.push(file.name+'（尚未支援此門市範本）');continue}
+  const kind=/陳列/.test(file.name)?'display':'warehouse';
+  const id=key+':'+kind;
+  originalTemplateFiles.set(id,file);added++;
+  try{await localTemplateOperation('put',id,file)}catch(e){failed.push(file.name+'（本機保存失敗，僅本次可使用）')}
+ }
+ displayTemplateStatus(added?'本次新增／取代 '+added+' 份範本。'+(failed.length?'注意：'+failed.join('；'):''):(failed.join('；')||'沒有辨識到可用範本'));
+ input.value='';
+}
+async function clearLocalTemplates(){
+ if(!confirm('確定清除儲存在本裝置瀏覽器的原始 Excel 範本？'))return;
+ await templateReadyPromise;
+ try{await localTemplateOperation('clear');originalTemplateFiles.clear();displayTemplateStatus('已清除本機保存的範本。')}catch(e){alert('清除本機範本失敗：'+e.message)}
 }
 function u16(d,o){return d[o]|d[o+1]<<8}
 function u32(d,o){return (d[o]|d[o+1]<<8|d[o+2]<<16|d[o+3]<<24)>>>0}
@@ -123,7 +169,8 @@ function downloadWorkbook(blob,name){
 }
 async function downloadTemplateBasedFiles(){
  try{
-  if(!originalTemplateFiles.size)throw Error('請先選擇原始信義／ATT Excel 範本，才能產生檔案');
+  await templateReadyPromise;
+  if(!originalTemplateFiles.size){document.getElementById('originalTemplates')?.focus();displayTemplateStatus('尚未設定原始 Excel 範本。請使用上方「選擇範本」一次設定，系統不會自動從 ChatGPT 附件取得檔案。');return;}
   if(!rows.length)throw Error('尚無配貨資料');
   const per=new Set(rows.map(r=>r.period).filter(Boolean));
   if(per.size>1)throw Error('多個不同檔期需分開產生檔案');
@@ -146,7 +193,7 @@ async function downloadTemplateBasedFiles(){
      if(n)records.push({sku:r.sku,qty:n,name:r.name,color:r.color,size:r.size||r.sku.split('-').pop()});
     }
     if(!records.length)continue;
-    if(!t)throw Error('缺少 '+store+' '+zone+' 的原始範本，禁止用其他檔案代替');
+    if(!t){displayTemplateStatus('尚缺「'+store+' '+zone+'」原始匯入範本，請從上方選擇檔案。');return;}
     const xlsx=await outputFromOriginal(t,records,store);
     const filename=(store==='ATT'?'PA ATT':'PA信義')+'店_'+zone+'_'+period+(mode==='new'?'新品':'補貨')+'.xlsx';
     details.push({blob:xlsx,name:filename,count:records.reduce((a,r)=>a+r.qty,0)});
