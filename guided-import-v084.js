@@ -178,7 +178,7 @@ function guideFileMarkup(kind){
  f.sheets.map((sh,j)=>'<option value="'+j+'" '+(f.selected===String(j)?'selected':'')+'>'+esc(sh.name)+'</option>').join('')+
  (kind==='stock'?'<option value="all" '+(f.selected==='all'?'selected':'')+'>全部工作表</option>':'')+
  '</select>':f.sheets?.length===1?'<span class="sub">'+esc(f.sheets[0].name)+'</span>':'')+
- '<span class="sub">'+f.entries.length+' 筆</span><button onclick="removeImported(\''+kind+'\','+i+')">移除</button></div>').join('');
+ '<span class="sub">'+(f.autoSelected?'自動選取 · ':'')+f.entries.length+' 筆</span><button onclick="removeImported(\''+kind+'\','+i+')">移除</button></div>').join('');
 }
 function guideRender(){
  const root=document.getElementById('guidedArea');if(!root)return;
@@ -215,6 +215,38 @@ function guideRender(){
  content+'<div id="guideNotice" class="sub">'+esc(guided.error||'')+'</div>';
 }
 const guideOldImport=importFiles;
+function guideTabScore(tab,index,kind){
+ const name=String(tab.name||'').trim(),compact=name.replace(/[\s　]/g,'');
+ let score=0;
+ if(kind==='demand'){
+  if(/補貨|叫貨|營運確認|需求/.test(compact))score+=200000;
+  if(/PZ|PAZZO/i.test(compact))score+=100000;
+  if(/測試|範例|制服|公告|說明|封面|設定|目錄|庫存|資料彙整/i.test(compact))score-=350000;
+  const date=/(?:^|[^\d])(\d{2})(\d{2})(?!\d)/g;let match,latest=0;
+  while((match=date.exec(compact))!==null){
+   const month=Number(match[1]),day=Number(match[2]);
+   if(month>=1&&month<=12&&day>=1&&day<=31)latest=Math.max(latest,month*100+day);
+  }
+  score+=latest*10;
+ }else if(/商品批次|庫存|現貨|工作表1/.test(compact))score+=100000;
+ // 順序只用於同分決勝；最終仍必須實際辨識成功。
+ return score-index*0.01;
+}
+async function guideAutoChoose(file){
+ const sorted=file.book.tabs.map((tab,i)=>({i,score:guideTabScore(tab,i,file.kind)})).sort((a,b)=>b.score-a.score);
+ const failures=[];
+ for(const candidate of sorted){
+  try{
+   const entries=await guideReadSheet(file,candidate.i);
+   if(!entries.length)continue;
+   file.selected=String(candidate.i);
+   file.entries=entries;
+   file.autoSelected=true;
+   return;
+  }catch(err){failures.push(file.book.tabs[candidate.i].name+'：'+err.message)}
+ }
+ throw Error('未找到可辨識的'+(file.kind==='demand'?'需求':'庫存')+'工作表'+(failures.length?'（例如：'+failures[0]+'）':''));
+}
 importFiles=async function(kind,files){
  if(!files?.length)return;
  guided.error='';
@@ -227,10 +259,9 @@ importFiles=async function(kind,files){
    if(/\.xlsx$/i.test(file.name)){
     const book=await guideOpenWorkbook(file);
     if(!book.tabs.length)throw Error('找不到工作表');
-    const selected=book.tabs.length===1?'0':'';
     const f={name:file.name,size:file.size,modified:file.lastModified,sheets:book.tabs.map(t=>({name:t.name,entries:[]})),
-      selected,entries:[],book,kind};
-    if(selected==='0')f.entries=await guideReadSheet(f,0);
+      selected:'',entries:[],book,kind,autoSelected:false};
+    await guideAutoChoose(f);
     importState[kind].push(f);
    }else{
     const tabs=await impRead(file);
@@ -246,7 +277,7 @@ const guideOldSelect=selectImportedSheet;
 selectImportedSheet=async function(kind,index,value){
  const file=importState[kind][index];if(!file)return;
  const previous=file.selected;
- file.selected=value;file.entries=[];
+ file.selected=value;file.entries=[];file.autoSelected=false;
  try{
   if(file.book){
    if(value==='all'&&kind==='stock'){
