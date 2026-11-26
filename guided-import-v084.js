@@ -104,6 +104,34 @@ impDemandTable=function(data,source){
  if(!out.length)throw Error(source+'：沒有補貨需求大於 0 的商品');
  return out;
 };
+impStockTable=function(data,source){
+ const {head,records}=guideHeader(data,'stock',source);
+ const skuCol=guideIndex(head,/^(條碼|SKU|品號|商品SKU|商品編號)$/i);
+ const alternative=guideIndex(head,/^(貨號|9碼貨號)$/i);
+ const stockCol=guideIndex(head,/^(庫存|現貨庫存|可用庫存|庫存數量|現貨數量|可配庫存)$/i);
+ const skuIndex=skuCol>=0?skuCol:alternative;
+ if(skuIndex<0||stockCol<0)throw Error(source+'：找不到庫存貨號或數量欄');
+ const out=[];
+ for(const row of records){
+  const sku=String(row[skuIndex]??'').trim();if(!sku)continue;
+  const val=String(row[stockCol]??'').trim();
+  if(!val)continue;
+  const qty=impWhole(val,'庫存 '+sku);
+  const nine=guide9(row,head,sku);
+  if(!nine)throw Error(source+'：庫存 '+sku+' 缺少 9 碼貨號及有效條碼');
+  out.push({sku,spu:nine,stock:qty,size:impField(row,head,'size'),
+    name:impField(row,head,'name'),color:impField(row,head,'color'),source});
+ }
+ if(!out.length)throw Error(source+'：沒有可用庫存');
+ return out;
+};
+const guideBaseTotals=impTotals;
+impTotals=function(){
+ const t=guideBaseTotals();
+ // 後台查詢完整九碼貨號，可能包含本次不需配貨的尺寸/顏色。
+ t.warnings=t.warnings.filter(w=>!w.startsWith('庫存未對應需求：'));
+ return t;
+};
 function guideList(){
  const demand=importState.demand.flatMap(f=>f.entries);
  const seen=new Set(),codes=[];
@@ -236,8 +264,20 @@ const guideOldSetMode=setMode;
 setMode=function(m){guideOldSetMode(m);guided.stage=1;guideRender()};
 const guideOldConfirmed=confirmNewEntry;
 confirmNewEntry=function(){guideOldConfirmed();guideRender()};
-const guideOldNewEntry=renderNewEntry;
-renderNewEntry=function(){guideOldNewEntry();const area=document.getElementById('guidedArea');if(area)area.style.opacity=(mode==='new'&&!newConfirmed)?'0.55':'1'};
+renderNewEntry=function(){
+ document.getElementById('newEntry')?.remove();
+ if(mode!=='new')return;
+ const home=document.getElementById('home'),bar=document.createElement('div');
+ bar.id='newEntry';bar.className='box';bar.style.margin='12px 0';
+ bar.innerHTML='<div class="row" style="gap:12px;align-items:center"><b>本次新品配貨門市</b><span>預設 8 間</span>'+
+ '<label><input type="checkbox" '+(includeDalong?'checked':'')+' onchange="includeDalong=this.checked;newConfirmed=false;renderNewEntry();guideRender()"> 加入大隆</label>'+
+ '<span>共 '+(includeDalong?9:8)+' 間</span>'+
+ '<button class="primary" onclick="confirmNewEntry()">確認門市</button>'+
+ '<span class="sub">'+(newConfirmed?'已確認':'尚未確認')+'</span></div>';
+ const before=document.getElementById('guidedArea')||home.querySelector('.guide-tools')||home.querySelector('.row');
+ if(before?.parentElement===home)home.insertBefore(bar,before);else home.appendChild(bar);
+};
+
 function guideMount(){
  const home=document.getElementById('home'),panel=document.getElementById('importPanel');
  if(!home||!panel)return;
