@@ -16,11 +16,38 @@
 #work.new-workbench .tablebox .group-total{font-weight:700;background:#f6f1eb}
 #work.new-workbench .tablebox .grid-invalid{background:#ffe6e1!important}
 #work.new-workbench .tablebox .grid-warning{background:#fff2d8!important}
-</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.10</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
+
+/* v0.8.11: only new arrivals use a compact two-column sticky grid. */
+#work.new-workbench .tablebox{position:relative;overflow:auto;max-height:65vh;overscroll-behavior:contain}
+#work.new-workbench .tablebox table{table-layout:fixed;width:max-content;min-width:0;border-spacing:0}
+#work.new-workbench .tablebox th,#work.new-workbench .tablebox td{
+ position:static;left:auto;top:auto;z-index:auto;min-width:0!important;width:auto;
+ font-size:12px;line-height:1.25;padding:5px 4px!important;
+ white-space:nowrap;overflow:visible;background-clip:padding-box
+}
+#work.new-workbench .tablebox th{position:sticky;top:0;z-index:5;height:34px}
+#work.new-workbench .tablebox th.group-sub{position:sticky;top:34px;z-index:5;height:32px;padding:4px 2px!important}
+#work.new-workbench .tablebox th.group-head{min-width:0!important;height:34px}
+#work.new-workbench .tablebox th.sticky-code,
+#work.new-workbench .tablebox td.sticky-code{position:sticky!important;left:0!important;width:108px;min-width:108px!important;max-width:108px;background:#fff!important;z-index:7}
+#work.new-workbench .tablebox th.sticky-sku,
+#work.new-workbench .tablebox td.sticky-sku{position:sticky!important;left:108px!important;width:132px;min-width:132px!important;max-width:132px;background:#fff!important;z-index:7}
+#work.new-workbench .tablebox th.sticky-code,#work.new-workbench .tablebox th.sticky-sku{background:#f1efeb!important;z-index:10}
+#work.new-workbench .tablebox td.meta-cell{min-width:0!important;text-align:left}
+#work.new-workbench .tablebox td.name-cell{min-width:0!important;width:178px;min-width:178px!important;max-width:178px;overflow:hidden;text-overflow:ellipsis}
+#work.new-workbench .tablebox td.small-cell{width:44px;min-width:44px!important}
+#work.new-workbench .tablebox td.total-cell{width:62px;min-width:62px!important}
+#work.new-workbench .tablebox td.stock-cell{width:54px;min-width:54px!important}
+#work.new-workbench .tablebox td.store-cell,#work.new-workbench .tablebox th.group-sub{width:58px;min-width:58px!important}
+#work.new-workbench .tablebox .qty-input{width:49px;min-width:49px;height:29px;padding:3px 1px;text-align:center;font-size:12px}
+#work.new-workbench .tablebox .qty-input::-webkit-inner-spin-button{appearance:none}
+#work.new-workbench .store-jump{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:6px 0 10px}
+#work.new-workbench .store-jump button{font-size:12px;padding:6px 9px}
+</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.11</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">① 補貨</button><button id="modeNew" onclick="setMode('new')">② 新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub"><b>上傳請移除機密資訊，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數</b></div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div></section>
 <section id="settings" class="card hide"><h2 id="settingsTitle">設定</h2><p class="sub">補貨與新品設定分開保存於目前瀏覽器，沒有同步至雲端。</p><div class="row" id="settingFields"></div><h3>配貨優先順序（最高到最低）</h3><div id="priority"></div><div class="row"><button class="primary" onclick="saveSettings()">儲存設定</button><button onclick="setStep('home')">返回</button></div></section>
-<section id="work" class="hide"><div class="card"><h2 id="workTitle">配貨預覽</h2><div class="row"><button onclick="setStep('home')">重新匯入</button><button onclick="allocate()">重新計算建議</button><button onclick="restore()">還原建議</button><button class="primary" onclick="approve()">套用並檢查</button></div><div id="newControls"></div><div id="summary" class="row"></div><div id="alerts"></div><div class="tablebox"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div><p class="sub">數量為 0 的門市維持 0。人工改動不會觸發其他門市自動重配。表格的第一、二欄與表頭固定，手機可左右滑動。</p></div></section>
+<section id="work" class="hide"><div class="card"><h2 id="workTitle">配貨預覽</h2><div class="row" id="workActions"><button onclick="setStep('home')">重新匯入</button><button onclick="allocate()">重新計算建議</button><button onclick="restore()">還原建議</button><button class="primary" onclick="approve()">套用並檢查</button></div><div id="newControls"></div><div id="summary" class="row"></div><div id="alerts"></div><div class="tablebox"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div><p class="sub">數量為 0 的門市維持 0。人工改動不會觸發其他門市自動重配。表格的第一、二欄與表頭固定，手機可左右滑動。</p></div></section>
 <section id="result" class="card hide"><h2>配貨結果總覽</h2><div id="resultSummary"></div><div id="zoneSummary" style="display:none"></div><div id="zoneEditor" style="margin:10px 0"></div><div class="row"><button onclick="setStep('work')">返回預覽</button><button onclick="downloadResult()">匯出配貨總覽 Excel</button><button class="primary" onclick="downloadTemplateBasedFiles()">下載全門市打單 Excel ZIP（測試）</button></div><div class="warn" style="padding:10px 12px"><b>匯入提醒</b>：上傳前請確認已移除公司機密資訊；正式打單前，請先確認匯出檔案正確。</div>
 <div class="row" style="gap:10px"><label><b>首次設定／更換兩份公版（xlsx）</b> <input id="originalTemplates" type="file" accept=".xlsx" multiple onchange="inspectOriginalTemplates(event)"></label><button type="button" onclick="clearLocalTemplates()">清除範本</button></div>
 <div id="templateInfo" class="sub">正在檢查本機已保存的範本…</div>
@@ -2210,9 +2237,21 @@ function newWorkbenchRender(){
  rows.forEach((row,index)=>{if(!groups.has(row.spu))groups.set(row.spu,[]);groups.get(row.spu).push({row,index})});
  const activeStores=stores.filter(store=>store!=='大隆'||includeDalong);
  const colspan=8+activeStores.reduce((sum,store)=>sum+newStoreParts(store).length,0);
+ const actions=document.getElementById('workActions');
+ if(actions)actions.innerHTML='<button class="primary" onclick="approve()">套用</button>'+
+  '<button onclick="newInitialize()">初始化</button>'+
+  '<button onclick="newUndo()" '+(!newHistory.length?'disabled':'')+'>上一步'+(newHistory.length?'（'+newHistory.length+'）':'')+'</button>'+
+  '<button onclick="setStep(\'home\')">重新匯入</button>';
+ const controls=document.getElementById('newControls');
+ if(controls){
+  const oldOpen=controls.querySelector('details')?.open;
+  if(oldOpen!==undefined)newZeroExpanded=oldOpen;
+  controls.innerHTML=newZeroMarkup();
+ }
+ newRenderStoreJump(activeStores);
  document.getElementById('thead').innerHTML='<tr>'+
-  ['9 碼貨號','13 碼品號','品名','顏色','尺寸','叫貨總數','庫存','EC 剩餘'].map(t=>'<th rowspan="2" style="white-space:nowrap">'+t+'</th>').join('')+
-  activeStores.map(store=>'<th class="group-head" colspan="'+newStoreParts(store).length+'" style="background:'+colors[stores.indexOf(store)]+'">'+esc(store)+'</th>').join('')+
+  ['9 碼貨號','13 碼品號','品名','顏色','尺寸','叫貨總數','庫存','EC 剩餘'].map((t,i)=>'<th rowspan="2" class="'+(i===0?'sticky-code':i===1?'sticky-sku':'')+'">'+t+'</th>').join('')+
+  activeStores.map(store=>'<th class="group-head" data-store="'+esc(store)+'" colspan="'+newStoreParts(store).length+'" style="background:'+colors[stores.indexOf(store)]+'">'+esc(store)+'</th>').join('')+
   '</tr><tr>'+activeStores.map(store=>newStoreParts(store).map(label=>
    '<th class="group-sub" style="background:'+colors[stores.indexOf(store)]+'">'+label+'</th>').join('')).join('')+'</tr>';
  const input=(value,ri,store,zone)=>'<input class="qty-input" type="number" min="0" step="1" value="'+value+'" onchange="'+(zone?
@@ -2225,12 +2264,12 @@ function newWorkbenchRender(){
   for(let k=0;k<items.length;k++){
    const {row,index}=items[k],used=newQtyTotal(row),left=Number(row.stock||0)-used;
    let cells='';
-   if(k===0)cells='<td class="meta-cell" rowspan="'+items.length+'"><b>'+esc(code)+'</b></td>';
-   cells+='<td class="meta-cell">'+esc(row.sku)+(row.blocked?' ⛔':'')+'</td>'+
-    '<td class="meta-cell">'+esc(row.name)+'</td><td>'+esc(row.color)+'</td><td>'+esc(row.size)+'</td>';
-   if(k===0)cells+='<td class="group-total" rowspan="'+items.length+'">'+total+'</td>';
-   cells+='<td class="number-cell">'+Number(row.stock||0)+'</td>'+
-    '<td class="number-cell '+(left<0?'grid-invalid':'')+'">'+left+'</td>';
+   if(k===0)cells='<td class="meta-cell sticky-code" rowspan="'+items.length+'"><b>'+esc(code)+'</b></td>';
+   cells+='<td class="meta-cell sticky-sku">'+esc(row.sku)+(row.blocked?' ⛔':'')+'</td>'+
+    '<td class="meta-cell name-cell" title="'+esc(row.name)+'">'+esc(row.name)+'</td><td class="small-cell">'+esc(row.color)+'</td><td class="small-cell">'+esc(row.size)+'</td>';
+   if(k===0)cells+='<td class="group-total total-cell" rowspan="'+items.length+'">'+total+'</td>';
+   cells+='<td class="number-cell stock-cell">'+Number(row.stock||0)+'</td>'+
+    '<td class="number-cell stock-cell '+(left<0?'grid-invalid':'')+'">'+left+'</td>';
    for(const store of activeStores){
     const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+'"',qty=Number(row.qty[si]||0),needs=Number(row.demand[si]||0);
     cells+='<td class="store-cell" '+bg+'>'+needs+'</td><td class="store-cell" '+bg+'>'+input(qty,index,store,'')+'</td>';
