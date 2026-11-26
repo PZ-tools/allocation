@@ -242,7 +242,33 @@ async function downloadTemplateBasedFiles(){
   const actual=files.reduce((a,x)=>a+x.count,0);
   if(actual!==expected)throw Error('輸出總件數 '+actual+' 與核准總件數 '+expected+' 不一致，已中止');
   if(!files.length)throw Error('沒有非零配貨數，無可輸出檔案');
-  for(const f of files)downloadWorkbook(f.blob,f.name);
-  document.getElementById('exportStatus').textContent='已依兩份原始範本產出 '+files.length+' 份 Excel，共 '+actual+' 件。公司系統正式匯入仍待驗證。';
+  // 一次下載：將全部門市的 Excel 原檔封裝為單一 ZIP。
+  // XLSX 本身也是 ZIP；這裡保留每一份原始範本產出的檔案位元組，絕不重建內容。
+  const zipEntries=[];
+  const names=new Set();
+  for(const f of files){
+   if(names.has(f.name))throw Error('匯出檔名重複：'+f.name);
+   names.add(f.name);
+   const data=new Uint8Array(await f.blob.arrayBuffer());
+   if(data.length<4||u32(data,0)!==0x04034b50)throw Error('產生的 Excel 無效：'+f.name);
+   zipEntries.push({name:f.name,nameBytes:enc.encode(f.name),data,method:0,csize:data.length,usize:data.length,crc:crc(data)});
+  }
+  const report=['配貨小幫手GOGOGO｜打單 Excel 測試檔',
+    '作業：'+(mode==='new'?'新品':'補貨'),'檔期：'+period,
+    '門市：'+[...new Set([...recordsByFile.keys()].map(k=>k.split('|')[0]))].join('、'),
+    'Excel 檔案數：'+files.length,'合計件數：'+actual,
+    '注意：僅含本次有非零配貨數量的門市分區；不代表正式系統匯入 PASS。',
+    '',
+    '檔名｜件數',...files.map(f=>f.name+'｜'+f.count)].join('\\r\\n');
+  const reportData=enc.encode(report);
+  zipEntries.push({name:'打單檔案核對.txt',nameBytes:enc.encode('打單檔案核對.txt'),data:reportData,method:0,csize:reportData.length,usize:reportData.length,crc:crc(reportData)});
+  const packed=zipRepack(zipEntries);
+  // 回讀 ZIP 目錄，確保檔案數量、名稱與位元組長度一致。
+  const verified=zipRead(new Uint8Array(await packed.arrayBuffer()));
+  if(verified.length!==zipEntries.length||
+     verified.some((e,i)=>e.name!==zipEntries[i].name||e.usize!==zipEntries[i].usize||e.crc!==zipEntries[i].crc))
+   throw Error('ZIP 封裝驗證失敗，已停止下載');
+  downloadWorkbook(packed,'配貨小幫手GOGOGO_'+(mode==='new'?'新品':'補貨')+'_'+period+'_各店打單檔.zip');
+  document.getElementById('exportStatus').textContent='ZIP 已產生：'+files.length+' 份 Excel，涵蓋 '+new Set([...recordsByFile.keys()].map(k=>k.split('|')[0])).size+' 家有配貨門市，共 '+actual+' 件。只下載一次；公司系統匯入仍待驗證。';
  }catch(err){alert('原始範本匯出停止：'+err.message)}
 }
