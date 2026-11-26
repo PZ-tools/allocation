@@ -1015,7 +1015,7 @@ function summaryXlsxBlob(mainRows,detailRows){
  const entries={
   '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
   '_rels/.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
-  'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="配貨總覽" sheetId="1" r:id="rId1"/><sheet name="分區明細" sheetId="2" r:id="rId2"/></sheets></workbook>',
+  'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="配貨總覽" sheetId="1" r:id="rId1"/><sheet name="數量確認" sheetId="2" r:id="rId2"/></sheets></workbook>',
   'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
   'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF302B29"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1EDE9"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
   'xl/worksheets/sheet1.xml':summarySheetXml(mainRows,{headerLimit:4}),
@@ -1204,5 +1204,33 @@ renderSettings=function(){
   '<label>SKU 上限 <input type="number" min="0" step="1" id="capNumber" value="'+skuCap.value+'"></label></div></div>';
   prio.innerHTML='';footer.innerHTML='<button class="primary" onclick="saveSkuCap082()">儲存新品上限</button><span class="sub" id="settingsFeedback"></span><button onclick="setStep(\'home\')">返回</button>';
  }
+};
+</script><script>
+/* v0.8.2: two-sheet allocation overview; summary totals on row 2 only */
+downloadResult=function(){
+ try{
+  const date=exportDateYMD(),title='PAZZO_'+(mode==='new'?'新品':'補貨')+'_'+date+'.xlsx';
+  const totals=stores.map((store,i)=>rows.reduce((sum,r)=>sum+Number(r.qty[i]||0),0));
+  const mainRows=[
+   ['SKU','SPU','庫存',...stores,'庫存剩餘'],
+   ['配貨總數','','',...totals,''],
+   ...rows.map(r=>[r.sku,r.spu,r.stock,...stores.map((s,i)=>Number(r.qty[i]||0)),
+    r.stock-r.qty.reduce((a,b)=>a+Number(b||0),0)])
+  ];
+  const checkRows=[['門市','倉庫','陳列','總數']];
+  for(let i=0;i<stores.length;i++){
+   const sum=summarizeZone(stores[i]);
+   const warehouse=sum.unknown?'待確認':(sum.warehouse||'');
+   const display=sum.unknown?'待確認':(sum.display||'');
+   if(!sum.unknown&&Number(sum.warehouse||0)+Number(sum.display||0)!==totals[i])
+    throw Error(stores[i]+' 分區合計與配貨總數不相符');
+   checkRows.push([stores[i],warehouse,display,totals[i]]);
+  }
+  if(checkRows.length!==stores.length+1)throw Error('門市數量確認列數不符');
+  const grandTotal=totals.reduce((a,b)=>a+b,0);
+  if(grandTotal!==rows.reduce((a,r)=>a+r.qty.reduce((v,n)=>v+Number(n||0),0),0))
+   throw Error('Excel 件數總合核對失敗');
+  downloadWorkbook(summaryXlsxBlob(mainRows,checkRows),title);
+ }catch(err){alert('配貨總覽 Excel 匯出停止：'+err.message)}
 };
 </script></body></html>
