@@ -75,7 +75,11 @@
 #work.new-workbench > .card > .tablebox td.sticky-code,
 #work.new-workbench > .card > .tablebox td.sticky-color,
 #work.new-workbench > .card > .tablebox td.sticky-size{box-shadow:1px 0 0 #e5dcd4}
-</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.15</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
+
+/* v0.8.16: preserve confirmed store widths and all three frozen columns. */
+#work.new-workbench .new-meta-toggle{margin:5px 0 8px;display:flex;align-items:center}
+#work.new-workbench .new-meta-toggle button{font-size:12px;padding:6px 10px}
+</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.16</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">① 補貨</button><button id="modeNew" onclick="setMode('new')">② 新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub"><b>上傳請移除機密資訊，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數</b></div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div></section>
 <section id="settings" class="card hide"><h2 id="settingsTitle">設定</h2><p class="sub">補貨與新品設定分開保存於目前瀏覽器，沒有同步至雲端。</p><div class="row" id="settingFields"></div><h3>配貨優先順序（最高到最低）</h3><div id="priority"></div><div class="row"><button class="primary" onclick="saveSettings()">儲存設定</button><button onclick="setStep('home')">返回</button></div></section>
@@ -2281,13 +2285,23 @@ function newWorkbenchRender(){
   '<button onclick="setStep(\'home\')">重新匯入</button>';
  const controls=document.getElementById('newControls');
  if(controls){
-  // Keep the existing expanded selector DOM in place: rebuilding it on each
-  // checkbox change displaced the page and the selector's own scroll position.
   if(!controls.querySelector('details[data-new-zero]'))controls.innerHTML=newZeroMarkup();
   newSyncZeroControls(controls);
  }
  newRenderStoreJump(activeStores);
- const colWidths=[105,65,45,190,132,65,45,72,55,65];
+ const grid=host.querySelector(':scope > .card > .tablebox');
+ if(grid){
+  let toggle=document.getElementById('newMetaToggle');
+  if(!toggle){
+   toggle=document.createElement('div');
+   toggle.id='newMetaToggle';toggle.className='new-meta-toggle';
+   grid.before(toggle);
+  }
+  toggle.innerHTML='<button type="button" onclick="newToggleMeta()">'+(newMetaCollapsed?'＋ 展開商品資訊':'－ 收合商品資訊')+'</button>';
+ }
+ // Preserve all widths of the visible existing columns and every store column.
+ const detailWidths=newMetaCollapsed?[]:[190,132,55,72];
+ const colWidths=[105,65,45,...detailWidths,65,65];
  for(const store of activeStores)colWidths.push(...newStoreParts(store).map(t=>t==='需求'?48:58));
  const table=host.querySelector(':scope > .card > .tablebox > table');
  if(table){
@@ -2299,7 +2313,8 @@ function newWorkbenchRender(){
   colgroup.innerHTML=colWidths.map(width=>'<col style="width:'+width+'px">').join('');
   table.prepend(colgroup);
  }
- const heads=['貨號','顏色','尺寸','品名','品號','顏色','尺寸','叫貨數','庫存','EC剩餘'];
+ const metaHeads=newMetaCollapsed?[]:['品名','品號','庫存','總叫貨'];
+ const heads=['貨號','顏色','尺寸',...metaHeads,'配貨數','EC剩餘'];
  document.getElementById('thead').innerHTML='<tr>'+
   heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+'</th>').join('')+
   activeStores.map(store=>'<th class="group-head" data-store="'+esc(store)+'" colspan="'+newStoreParts(store).length+'" style="background:'+colors[stores.indexOf(store)]+'">'+esc(store)+'</th>').join('')+
@@ -2308,11 +2323,11 @@ function newWorkbenchRender(){
  const input=(value,ri,store,zone)=>'<input class="qty-input" type="number" min="0" step="1" value="'+value+'" onchange="'+(zone?
   'newSetZone('+ri+',\''+store+'\',\''+zone+'\',this.value)':
   'newSetQty('+ri+','+stores.indexOf(store)+',this.value)')+'">';
- // Aggregates: ordered totals are counted once per 9-character group.
  const orderedTotal=[...groups.values()].reduce((sum,items)=>sum+items.reduce((subtotal,{row})=>subtotal+newDemandTotal(row),0),0);
  const sumStock=rows.reduce((sum,r)=>sum+Number(r.stock||0),0);
- const sumRemaining=rows.reduce((sum,r)=>sum+Number(r.stock||0)-newQtyTotal(r),0);
- const numbers=[orderedTotal,sumStock,sumRemaining];
+ const sumAllocated=rows.reduce((sum,r)=>sum+newQtyTotal(r),0);
+ const sumRemaining=sumStock-sumAllocated;
+ const numbers=newMetaCollapsed?[sumAllocated,sumRemaining]:[sumStock,orderedTotal,sumAllocated,sumRemaining];
  for(const store of activeStores){
   const si=stores.indexOf(store);
   numbers.push(rows.reduce((sum,r)=>sum+Number(r.demand[si]||0),0));
@@ -2322,25 +2337,27 @@ function newWorkbenchRender(){
     numbers.push(rows.reduce((sum,r)=>sum+Number(newZoneState(r,store).values[zone]||0),0));
   }
  }
- const sumCells=[
-  '<td class="sticky-code">合計</td>','<td class="sticky-color"></td>','<td class="sticky-size"></td>',
-  '<td></td>','<td></td>','<td></td>','<td></td>'
- ].join('')+numbers.map((n,i)=>'<td class="'+(i<3?'':'new-store-total')+'">'+n+'</td>').join('');
- const body=['<tr class="new-total-row">'+sumCells+'</tr>'];
+ const totalLabels=['<td class="sticky-code">合計</td>','<td class="sticky-color"></td>','<td class="sticky-size"></td>'];
+ if(!newMetaCollapsed)totalLabels.push('<td></td>','<td></td>');
+ const totalRow=totalLabels.join('')+numbers.map((n,i)=>'<td class="'+(i<(newMetaCollapsed?2:4)?'':'new-store-total')+'">'+n+'</td>').join('');
+ const body=['<tr class="new-total-row">'+totalRow+'</tr>'];
  for(const [code,items] of groups){
   const total=items.reduce((sum,{row})=>sum+newDemandTotal(row),0);
+  const groupBlocked=items.some(({row})=>row.blocked);
   for(let k=0;k<items.length;k++){
-   const {row,index}=items[k],used=newQtyTotal(row),left=Number(row.stock||0)-used;
+   const {row,index}=items[k],allocated=newQtyTotal(row),remaining=Number(row.stock||0)-allocated;
    let cells='';
-   if(k===0)cells='<td class="meta-cell sticky-code" rowspan="'+items.length+'"><b>'+esc(code)+'</b></td>';
-   cells+='<td class="small-cell sticky-color">'+esc(row.color)+'</td>'+
-    '<td class="small-cell sticky-size">'+esc(row.size)+'</td>'+
-    '<td class="meta-cell name-cell" title="'+esc(row.name)+'">'+esc(row.name)+'</td>'+
-    '<td class="meta-cell sku-cell">'+esc(row.sku)+(row.blocked?' ⛔':'')+'</td>'+
-    '<td class="small-cell">'+esc(row.color)+'</td><td class="small-cell">'+esc(row.size)+'</td>';
-   if(k===0)cells+='<td class="group-total total-cell" rowspan="'+items.length+'">'+total+'</td>';
-   cells+='<td class="number-cell stock-cell">'+Number(row.stock||0)+'</td>'+
-    '<td class="number-cell stock-cell '+(left<0?'grid-invalid':'')+'">'+left+'</td>';
+   if(k===0)cells='<td class="meta-cell sticky-code" rowspan="'+items.length+'"><b>'+esc(code)+'</b>'+(groupBlocked?' ⛔':'')+'</td>';
+   cells+='<td class="small-cell sticky-color">'+esc(row.color)+(remaining<allocated?' ⚠️':'')+'</td>'+
+    '<td class="small-cell sticky-size">'+esc(row.size)+'</td>';
+   if(!newMetaCollapsed){
+    cells+='<td class="meta-cell name-cell" title="'+esc(row.name)+'">'+esc(row.name)+'</td>'+
+     '<td class="meta-cell sku-cell">'+esc(row.sku)+'</td>'+
+     '<td class="number-cell stock-cell">'+Number(row.stock||0)+'</td>';
+    if(k===0)cells+='<td class="group-total total-cell" rowspan="'+items.length+'">'+total+'</td>';
+   }
+   cells+='<td class="number-cell">'+allocated+'</td>'+
+    '<td class="number-cell stock-cell '+(remaining<0?'grid-invalid':'')+'">'+remaining+'</td>';
    for(const store of activeStores){
     const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+'"',qty=Number(row.qty[si]||0),needs=Number(row.demand[si]||0);
     cells+='<td class="store-cell" '+bg+'>'+needs+'</td><td class="store-cell" '+bg+'>'+input(qty,index,store,'')+'</td>';
@@ -2359,13 +2376,14 @@ function newWorkbenchRender(){
  const issues=newGridIssues();
  document.getElementById('summary').innerHTML='<span class="pill">9 碼貨號 '+groups.size+' 組</span>'+
   '<span class="pill">13 碼品號 '+rows.length+' 筆</span>'+
-  '<span class="pill">已配 '+rows.reduce((sum,r)=>sum+newQtyTotal(r),0)+' 件</span>'+
+  '<span class="pill">已配 '+sumAllocated+' 件</span>'+
   '<span class="pill">待確認 '+issues.length+' 筆</span>';
  document.getElementById('alerts').innerHTML=issues.length?'<p class="warn">'+esc(issues.slice(0,5).join('；'))+'</p>':'';
 }
 
 /* v0.8.11: undo to the first imported allocation; isolated to the new-arrivals mode. */
-let newHistory=[],newInitialSnapshot=null,newZeroExpanded=false;
+let newHistory=[],newInitialSnapshot=null,newZeroExpanded=false,newMetaCollapsed=false;
+function newToggleMeta(){newMetaCollapsed=!newMetaCollapsed;render()}
 function newSnapshot(){
  return JSON.stringify({items:rows.map(r=>({
   qty:r.qty.slice(),blocked:!!r.blocked,
@@ -2386,7 +2404,7 @@ function newApplySnapshot(savedState){
  zeroReasons=state.reasons;
 }
 function newResetHistory(){
- newHistory=[];newInitialSnapshot=null;newZeroExpanded=false;
+ newHistory=[];newInitialSnapshot=null;newZeroExpanded=false;newMetaCollapsed=false;
  const controls=document.getElementById('newControls');
  if(controls)controls.innerHTML='';
 }
