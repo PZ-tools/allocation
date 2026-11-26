@@ -1,5 +1,37 @@
 /* PAZZO 0.8.4: guided replenishment / new import and 9-code backend lookup. */
-const guided={stage:1,batch:0,busy:false,error:'',confirmed:false};
+const guided={stage:1,batch:0,busy:false,error:'',confirmed:false,date:'',dateConfirmed:false};
+function guideIsoDay(){
+ const now=new Date();now.setHours(12,0,0,0);
+ const distance=(5-now.getDay()+7)%7;now.setDate(now.getDate()+distance);
+ return [now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
+}
+guided.date=guideIsoDay();
+function guideMMDD(){return guided.date.slice(5).replace('-','')}
+function guideSameDate(name){
+ const digits=guideMMDD();
+ if(!/^\d{4}$/.test(digits))return false;
+ return new RegExp('(?:^|[^0-9])'+digits+'(?![0-9])').test(String(name||''));
+}
+function guideBrandMatch(name,filename){
+ const tab=String(name||''),file=String(filename||'');
+ if(/ATT/i.test(file)){
+  if(/\(\s*(?:MS|美學)\s*\)/i.test(tab))return false;
+  return /\bPZ\b|PAZZO|補貨|^\\d{4}$/.test(tab);
+ }
+ return true;
+}
+function guideSetDate(value){
+ if(!/^\d{4}-\d\d-\d\d$/.test(value||''))return;
+ const d=new Date(value+'T12:00:00');
+ if(Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==value)return;
+ if(guided.date===value)return;
+ guided.date=value;guided.dateConfirmed=false;
+ // Changing the batch date invalidates every previous demand selection.
+ for(const file of importState.demand){file.selected='';file.entries=[];file.autoSelected=false;file.issue='請重新配對本次日期';}
+ guided.stage=1;guided.error='';guideRender();
+}
+function guideConfirmDate(){guided.dateConfirmed=true;guided.error='';guideRender()}
+
 function guideCode(n){return /^[A-Z0-9]{9}$/i.test(String(n||'').trim())?String(n).trim().toUpperCase():''}
 function guide9(row,head,barcode){
  const idx=head.findIndex(h=>['貨號','9碼貨號','九碼貨號','SPU','商品貨號'].includes(String(h||'').trim()));
@@ -153,12 +185,17 @@ function guideDemandIssues(){
  const files=importState.demand;
  const selected=files.flatMap(f=>f.entries);
  const warnings=[],keys=new Set();
- for(const f of files)if(f.sheets?.length>1&&f.selected==='')warnings.push(f.name+' 尚未選擇工作表');
+ for(const f of files){
+  if(f.issue)warnings.push(f.name+'：'+f.issue);
+  else if(f.selected==='')warnings.push(f.name+' 尚未選擇工作表');
+  else if(mode==='restock'&&(!guideSameDate(f.sheets?.[Number(f.selected)]?.name)||!guideBrandMatch(f.sheets?.[Number(f.selected)]?.name,f.name)))warnings.push(f.name+'：工作表不符合本次補貨日期／PAZZO 品牌');
+ }
  for(const r of selected){const k=[r.sku,r.store,r.zone].join('|');if(keys.has(k))warnings.push('重複需求：'+r.sku+'／'+r.store+(r.zone?'／'+r.zone:''));keys.add(k)}
  return warnings;
 }
 function guideNext(target){
  if(target===2){
+  if(mode==='restock'&&!guided.dateConfirmed){guideAlert('請先確認本次補貨日期');return}
   if(mode==='new'&&!newConfirmed){guideAlert('請先確認本次新品配貨門市');return}
   if(!importState.demand.some(f=>f.entries.length)||guideDemandIssues().length){guideAlert('請完成工作表選擇及需求核對');return}
  }
@@ -178,7 +215,9 @@ function guideFileMarkup(kind){
  f.sheets.map((sh,j)=>'<option value="'+j+'" '+(f.selected===String(j)?'selected':'')+'>'+esc(sh.name)+'</option>').join('')+
  (kind==='stock'?'<option value="all" '+(f.selected==='all'?'selected':'')+'>全部工作表</option>':'')+
  '</select>':f.sheets?.length===1?'<span class="sub">'+esc(f.sheets[0].name)+'</span>':'')+
- '<span class="sub">'+(f.autoSelected?'自動選取 · ':'')+f.entries.length+' 筆</span><button onclick="removeImported(\''+kind+'\','+i+')">移除</button></div>').join('');
+ '<span class="sub">'+(f.autoSelected?'自動選取 · ':'')+f.entries.length+' 筆</span>'+
+ (f.issue?'<span class="warn">'+esc(f.issue)+'</span>':'')+
+ '<button onclick="removeImported(\''+kind+'\','+i+')">移除</button></div>').join('');
 }
 function guideRender(){
  const root=document.getElementById('guidedArea');if(!root)return;
@@ -186,12 +225,12 @@ function guideRender(){
  const codes=guideList(),count=Math.ceil(codes.length/100),errors=guideDemandIssues(), t=impTotals();
  const stage=guided.stage,labels=['需求','貨號','庫存','配貨'];
  let content='';
- if(stage===1)content='<h3>01｜匯入門市需求</h3><p class="sub">選擇補貨 Excel，可多檔匯入；每份檔案選擇本次日期工作表。</p>'+
- '<label class="guide-upload">選擇需求檔案 <input aria-label="選擇需求檔案" type="file" multiple accept=".xlsx,.csv" onchange="importFiles(\'demand\',this.files);this.value=\'\'"></label>'+
+ if(stage===1)content='<h3>01｜匯入門市需求</h3>'+ (mode==='restock'?'<div class="guide-date"><label>本次補貨日期 <input type="date" value="'+guided.date+'" onchange="guideSetDate(this.value)"></label> <button class="'+(guided.dateConfirmed?'':'primary')+'" onclick="guideConfirmDate()">'+(guided.dateConfirmed?'✓ 日期已確認':'確認日期')+'</button></div><p class="sub">以 '+guideMMDD()+' 比對各店工作表。自動選取後仍可更改，日期不符不能進入下一步。</p>':'<p class="sub">選擇本次新品需求工作表。</p>')+
+ '<label class="guide-upload">選擇需求檔案 <input aria-label="選擇需求檔案" type="file" multiple accept=".xlsx,.csv" '+(mode==='restock'&&!guided.dateConfirmed?'disabled':'')+' onchange="importFiles(\'demand\',this.files);this.value=\'\'"></label>'+
  guideFileMarkup('demand')+
  '<p class="sub">'+(demand.length?'已辨識 '+demand.length+' 筆需求':'尚未匯入需求')+'</p>'+
  (errors.length?'<p class="warn">'+esc(errors.slice(0,3).join('；'))+'</p>':'')+
- '<button class="primary" onclick="guideNext(2)" '+(!demand.length||errors.length||(mode==='new'&&!newConfirmed)?'disabled':'')+'>確認需求並整理貨號 →</button>';
+ '<button class="primary" onclick="guideNext(2)" '+(!demand.length||errors.length||(mode==='new'&&!newConfirmed)||(mode==='restock'&&!guided.dateConfirmed)?'disabled':'')+'>確認需求並整理貨號 →</button>';
  if(stage===2){
   guided.batch=Math.min(guided.batch,Math.max(0,count-1));
   const visible=codes.slice(guided.batch*100,(guided.batch+1)*100);
@@ -241,22 +280,43 @@ function guideTabScore(tab,index,kind){
  return score-index*0.01;
 }
 async function guideAutoChoose(file){
+ if(file.kind==='demand'&&mode==='restock'){
+  const candidates=file.book.tabs.map((tab,i)=>({tab,i})).filter(({tab})=>
+   guideSameDate(tab.name)&&guideBrandMatch(tab.name,file.name));
+  if(!candidates.length){
+   file.issue='找不到 '+guideMMDD()+' 的 PAZZO 補貨工作表';
+   file.selected='';file.entries=[];return;
+  }
+  const valid=[],issues=[];
+  for(const c of candidates){
+   try{
+    const entries=await guideReadSheet(file,c.i);
+    if(entries.length)valid.push({i:c.i,entries,name:c.tab.name});
+   }catch(err){issues.push(c.tab.name+'：'+err.message)}
+  }
+  if(valid.length===1){
+   file.selected=String(valid[0].i);
+   file.entries=valid[0].entries;file.autoSelected=true;file.issue='';return;
+  }
+  file.selected='';file.entries=[];
+  file.issue=valid.length>1?'同日期有多個可辨識工作表，請手動選擇':
+   '本次日期工作表無法辨識需求'+(issues.length?'：'+issues[0]:'');
+  return;
+ }
  const sorted=file.book.tabs.map((tab,i)=>({i,score:guideTabScore(tab,i,file.kind)})).sort((a,b)=>b.score-a.score);
  const failures=[];
  for(const candidate of sorted){
   try{
-   const entries=await guideReadSheet(file,candidate.i);
-   if(!entries.length)continue;
-   file.selected=String(candidate.i);
-   file.entries=entries;
-   file.autoSelected=true;
-   return;
+   const entries=await guideReadSheet(file,candidate.i);if(!entries.length)continue;
+   file.selected=String(candidate.i);file.entries=entries;file.autoSelected=true;file.issue='';return;
   }catch(err){failures.push(file.book.tabs[candidate.i].name+'：'+err.message)}
  }
- throw Error('未找到可辨識的'+(file.kind==='demand'?'需求':'庫存')+'工作表'+(failures.length?'（例如：'+failures[0]+'）':''));
+ file.issue='無法辨識工作表'+(failures.length?'：'+failures[0]:'');
+ file.selected='';file.entries=[];
 }
 importFiles=async function(kind,files){
  if(!files?.length)return;
+ if(kind==='demand'&&mode==='restock'&&!guided.dateConfirmed){guided.error='請先確認本次補貨日期';guideRender();return}
  guided.error='';
  const array=Array.from(files);
  for(const file of array){
@@ -292,14 +352,18 @@ selectImportedSheet=async function(kind,index,value){
     for(let i=0;i<file.book.tabs.length;i++)file.entries.push(...await guideReadSheet(file,i));
    }else if(value!=='')file.entries=await guideReadSheet(file,Number(value));
   }else{file.entries=value==='all'?file.sheets.flatMap(s=>s.entries):value===''?[]:(file.sheets[Number(value)]?.entries||[])}
+  if(kind==='demand'&&mode==='restock'&&value!==''&&
+    (!guideSameDate(file.sheets[Number(value)]?.name)||!guideBrandMatch(file.sheets[Number(value)]?.name,file.name))){
+    file.issue='工作表與本次 '+guideMMDD()+' 補貨日期／品牌不符';
+  }else file.issue='';
   guided.error='';importState.errors=[];
- }catch(err){file.selected='';file.entries=[];guided.error=file.name+'：'+err.message;importState.errors=[guided.error]}
+ }catch(err){file.selected='';file.entries=[];file.issue=err.message;guided.error=file.name+'：'+err.message;importState.errors=[guided.error]}
  guideRender();
 };
 const guideOldRemove=removeImported;
 removeImported=function(kind,index){guideOldRemove(kind,index);guided.error='';guideRender()};
 const guideOldReset=clearImportState;
-clearImportState=function(){guideOldReset();guided.stage=1;guided.batch=0;guided.error='';guideRender()};
+clearImportState=function(){guideOldReset();guided.stage=1;guided.batch=0;guided.error='';guided.dateConfirmed=false;guideRender()};
 const guideOldSetMode=setMode;
 setMode=function(m){guideOldSetMode(m);guided.stage=1;guideRender()};
 const guideOldConfirmed=confirmNewEntry;
@@ -331,6 +395,7 @@ function guideMount(){
  const area=document.createElement('div');area.id='guidedArea';area.className='guide-main';home.insertBefore(area,wrapper);
  const css=document.createElement('style');
  css.textContent='.guide-main{padding:16px 0}.guide-main h3{margin:16px 0 9px}.guide-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:12px 0 19px}.guide-steps>div{border-radius:8px;text-align:center;background:#f3f3f3;padding:9px 3px;font-size:13px;color:#888}.guide-steps .is-active{background:#202020;color:white}.guide-steps .is-done{color:#21704b;background:#e7f4ed}.guide-upload{border:1px solid #ccc;padding:12px;border-radius:9px;display:block;margin:10px 0}.guide-upload input{display:block;margin-top:8px;max-width:100%}.guide-file{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}.guide-file span:first-child{flex:1;min-width:190px;overflow-wrap:anywhere}.guide-file select{max-width:200px}.guide-batches{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.guide-copy{background:#f5f5f5;border:1px solid #dedede;border-radius:8px;padding:12px;max-height:150px;overflow:auto;white-space:normal;overflow-wrap:anywhere;line-height:1.8;font-size:13px;margin:12px 0}.guide-nav{display:flex;flex-wrap:wrap;gap:9px;justify-content:space-between;margin:16px 0}.guide-tools{margin-top:25px;font-size:12px;opacity:.8}.guide-main button:disabled{opacity:.4;cursor:not-allowed}';
+ css.textContent+='.guide-date{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:10px 0 16px}.guide-date label{display:flex;gap:6px;align-items:center}.guide-date input{padding:8px;max-width:170px}.guide-file .warn{max-width:100%;font-size:12px}';
  document.head.appendChild(css);
  guideRender();
 }
