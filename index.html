@@ -75,7 +75,7 @@
 #work.new-workbench > .card > .tablebox td.sticky-code,
 #work.new-workbench > .card > .tablebox td.sticky-color,
 #work.new-workbench > .card > .tablebox td.sticky-size{box-shadow:1px 0 0 #e5dcd4}
-</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.13</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
+</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.14</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">① 補貨</button><button id="modeNew" onclick="setMode('new')">② 新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub"><b>上傳請移除機密資訊，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數</b></div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div></section>
 <section id="settings" class="card hide"><h2 id="settingsTitle">設定</h2><p class="sub">補貨與新品設定分開保存於目前瀏覽器，沒有同步至雲端。</p><div class="row" id="settingFields"></div><h3>配貨優先順序（最高到最低）</h3><div id="priority"></div><div class="row"><button class="primary" onclick="saveSettings()">儲存設定</button><button onclick="setStep('home')">返回</button></div></section>
@@ -1706,7 +1706,7 @@ newImportPanel();
 </script><script>
 /* PAZZO 0.8.4: guided replenishment / new import and 9-code backend lookup. */
 const guided={stage:1,batch:0,busy:false,error:'',confirmed:false,date:'',dateConfirmed:false};
-function guideNewDay(){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+(7-d.getDay())%7);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function guideNewDay(){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+((8-d.getDay())%7||7));return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 function guideIsoDay(){
  const now=new Date();now.setHours(12,0,0,0);
  const distance=(5-now.getDay()+7)%7;now.setDate(now.getDate()+distance);
@@ -2199,7 +2199,6 @@ function guideMount(){
  guideRender();
 }
 guideMount();
-
 
 </script><script>
 /* v0.8.9 new arrival workbook: grouped horizontal store headers and SKU-level editing.
