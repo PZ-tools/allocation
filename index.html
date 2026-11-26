@@ -3,47 +3,79 @@
 :root{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;color:#302b29;background:#faf8f6}*{box-sizing:border-box}body{margin:0}header{background:#fff;border-bottom:1px solid #e8e1da;padding:16px 4%;display:flex;align-items:center;justify-content:space-between;gap:10px}h1{font-size:21px;margin:0}small,.muted{color:#817872}.badge{background:#f9eadd;padding:7px 10px;border-radius:20px;font-size:12px}main{max-width:1500px;margin:auto;padding:20px 4%}button,input,select,textarea{font:inherit}button{background:white;border:1px solid #d8cbc0;border-radius:10px;padding:10px 14px;cursor:pointer;color:#342d29}button.primary{background:#44372f;color:#fff;border-color:#44372f}button.active{background:#f3e7dc;border-color:#a78b75;font-weight:700}.tabs{display:flex;gap:9px;flex-wrap:wrap;margin:20px 0}.card{background:#fff;padding:18px;border:1px solid #e9e1db;border-radius:15px;margin:15px 0}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}.row label{display:flex;gap:5px;align-items:center}input[type=number]{width:80px;padding:8px;border:1px solid #ddd0c9;border-radius:8px}input[type=text],input[type=file],select{padding:8px;border:1px solid #ddd0c9;border-radius:8px;max-width:100%}h2{font-size:19px;margin:4px 0 14px}h3{font-size:15px}.pill{display:inline-block;border-radius:30px;background:#f3efe9;padding:5px 10px;margin:3px;font-size:12px}table{border-collapse:separate;border-spacing:0;min-width:1120px;width:100%;font-variant-numeric:tabular-nums}th,td{border-bottom:1px solid #ece6e1;border-right:1px solid #f0ece9;text-align:center;padding:9px 6px;white-space:nowrap}th{position:sticky;top:0;z-index:3;background:#f1efeb}th:first-child,td:first-child{position:sticky;left:0;z-index:5;background:#fff;min-width:142px;text-align:left}th:nth-child(2),td:nth-child(2){position:sticky;left:142px;z-index:4;background:#fff;min-width:68px}th:first-child,th:nth-child(2){background:#f0eeec;z-index:7} .spu-line{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:8px 0;border-bottom:1px solid #ece6e1}.spu-line label{display:inline-flex;align-items:center;gap:5px}.spu-line .spu-id{min-width:175px;font-weight:700}.spu-line .sku-items{display:flex;flex-wrap:wrap;gap:5px}.spu-line .sku-items label{padding:5px 8px;border-radius:20px;background:#f3efe9;font-size:12px}.spu-line .sku-items label:has(input:disabled){opacity:.45}td input[type=number]{width:61px;padding:6px;text-align:center}th.store{background:var(--tint)}.tablebox{max-height:62vh;overflow:auto;border:1px solid #e5dcd4;border-radius:9px}.warn{background:#fff2ec;border:1px solid #f0c7b1;color:#8e422f;padding:12px;border-radius:9px}.ok{color:#347751}.error{color:#b14436;font-weight:bold}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:11px}.hide{display:none}.sub{font-size:13px;color:#756b64;line-height:1.75}.box{padding:13px;background:#fcf8f4;border-radius:10px}code{font-size:12px}footer{font-size:12px;color:#92867e;margin:32px 0} @media(max-width:600px){main{padding:14px}header{padding:14px}h1{font-size:18px}.card{padding:13px}}
  .priority-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 2px 14px}.priority-chip{flex:0 0 auto;background:#f7f1eb;border:1px solid #dbcbbd;border-radius:12px;padding:12px 14px;cursor:grab;touch-action:pan-y;user-select:none;font-weight:600}.priority-chip.dragging{opacity:.4}.priority-chip.over{outline:2px solid #9c7456}.breakdown-table{min-width:680px}.breakdown-table td,.breakdown-table th{position:static!important;min-width:0!important;text-align:center!important}.zone-edit-table{min-width:420px}.zone-edit-table td,.zone-edit-table th{position:static!important;min-width:0!important}.zone-edit-table input[type=number]{width:70px}.text-muted{color:#94867f} 
 /* v0.8.9: desktop-first new arrival verification grid */
-#work.new-workbench .tablebox{overflow:auto;max-width:100%;border:1px solid #e8e1da;border-radius:10px}
-#work.new-workbench .tablebox table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
-#work.new-workbench .tablebox th,#work.new-workbench .tablebox td{white-space:nowrap;vertical-align:middle;text-align:center;min-width:68px;padding:7px 9px;border-right:1px solid #eee6df;border-bottom:1px solid #eee6df}
-#work.new-workbench .tablebox th{position:sticky;top:0;background:#faf8f6;z-index:2;font-weight:700}
-#work.new-workbench .tablebox th.group-head{color:#302b29;text-align:center;min-width:112px}
-#work.new-workbench .tablebox th.group-sub{top:34px;min-width:70px;white-space:nowrap;word-break:keep-all;writing-mode:horizontal-tb;text-orientation:mixed}
-#work.new-workbench .tablebox .meta-cell{text-align:left;min-width:105px}
-#work.new-workbench .tablebox .number-cell{font-variant-numeric:tabular-nums}
-#work.new-workbench .tablebox .qty-input{width:65px;min-width:65px;padding:5px 4px;text-align:center}
-#work.new-workbench .tablebox .store-cell{background:var(--store-color)}
-#work.new-workbench .tablebox .group-total{font-weight:700;background:#f6f1eb}
-#work.new-workbench .tablebox .grid-invalid{background:#ffe6e1!important}
-#work.new-workbench .tablebox .grid-warning{background:#fff2d8!important}
+#work.new-workbench > .card > .tablebox{overflow:auto;max-width:100%;border:1px solid #e8e1da;border-radius:10px}
+#work.new-workbench > .card > .tablebox table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
+#work.new-workbench > .card > .tablebox th,#work.new-workbench > .card > .tablebox td{white-space:nowrap;vertical-align:middle;text-align:center;min-width:68px;padding:7px 9px;border-right:1px solid #eee6df;border-bottom:1px solid #eee6df}
+#work.new-workbench > .card > .tablebox th{position:sticky;top:0;background:#faf8f6;z-index:2;font-weight:700}
+#work.new-workbench > .card > .tablebox th.group-head{color:#302b29;text-align:center;min-width:112px}
+#work.new-workbench > .card > .tablebox th.group-sub{top:34px;min-width:70px;white-space:nowrap;word-break:keep-all;writing-mode:horizontal-tb;text-orientation:mixed}
+#work.new-workbench > .card > .tablebox .meta-cell{text-align:left;min-width:105px}
+#work.new-workbench > .card > .tablebox .number-cell{font-variant-numeric:tabular-nums}
+#work.new-workbench > .card > .tablebox .qty-input{width:65px;min-width:65px;padding:5px 4px;text-align:center}
+#work.new-workbench > .card > .tablebox .store-cell{background:var(--store-color)}
+#work.new-workbench > .card > .tablebox .group-total{font-weight:700;background:#f6f1eb}
+#work.new-workbench > .card > .tablebox .grid-invalid{background:#ffe6e1!important}
+#work.new-workbench > .card > .tablebox .grid-warning{background:#fff2d8!important}
 
 /* v0.8.11: only new arrivals use a compact two-column sticky grid. */
-#work.new-workbench .tablebox{position:relative;overflow:auto;max-height:65vh;overscroll-behavior:contain}
-#work.new-workbench .tablebox table{table-layout:fixed;width:max-content;min-width:0;border-spacing:0}
-#work.new-workbench .tablebox th,#work.new-workbench .tablebox td{
+#work.new-workbench > .card > .tablebox{position:relative;overflow:auto;max-height:65vh;overscroll-behavior:contain}
+#work.new-workbench > .card > .tablebox table{table-layout:fixed;width:max-content;min-width:0;border-spacing:0}
+#work.new-workbench > .card > .tablebox th,#work.new-workbench > .card > .tablebox td{
  position:static;left:auto;top:auto;z-index:auto;min-width:0!important;width:auto;
  font-size:12px;line-height:1.25;padding:5px 4px!important;
  white-space:nowrap;overflow:visible;background-clip:padding-box
 }
-#work.new-workbench .tablebox th{position:sticky;top:0;z-index:5;height:34px}
-#work.new-workbench .tablebox th.group-sub{position:sticky;top:34px;z-index:5;height:32px;padding:4px 2px!important}
-#work.new-workbench .tablebox th.group-head{min-width:0!important;height:34px}
-#work.new-workbench .tablebox th.sticky-code,
-#work.new-workbench .tablebox td.sticky-code{position:sticky!important;left:0!important;width:108px;min-width:108px!important;max-width:108px;background:#fff!important;z-index:7}
-#work.new-workbench .tablebox th.sticky-sku,
-#work.new-workbench .tablebox td.sticky-sku{position:sticky!important;left:108px!important;width:132px;min-width:132px!important;max-width:132px;background:#fff!important;z-index:7}
-#work.new-workbench .tablebox th.sticky-code,#work.new-workbench .tablebox th.sticky-sku{background:#f1efeb!important;z-index:10}
-#work.new-workbench .tablebox td.meta-cell{min-width:0!important;text-align:left}
-#work.new-workbench .tablebox td.name-cell{min-width:0!important;width:178px;min-width:178px!important;max-width:178px;overflow:hidden;text-overflow:ellipsis}
-#work.new-workbench .tablebox td.small-cell{width:44px;min-width:44px!important}
-#work.new-workbench .tablebox td.total-cell{width:62px;min-width:62px!important}
-#work.new-workbench .tablebox td.stock-cell{width:54px;min-width:54px!important}
-#work.new-workbench .tablebox td.store-cell,#work.new-workbench .tablebox th.group-sub{width:58px;min-width:58px!important}
-#work.new-workbench .tablebox .qty-input{width:49px;min-width:49px;height:29px;padding:3px 1px;text-align:center;font-size:12px}
-#work.new-workbench .tablebox .qty-input::-webkit-inner-spin-button{appearance:none}
+#work.new-workbench > .card > .tablebox th{position:sticky;top:0;z-index:5;height:34px}
+#work.new-workbench > .card > .tablebox th.group-sub{position:sticky;top:34px;z-index:5;height:32px;padding:4px 2px!important}
+#work.new-workbench > .card > .tablebox th.group-head{min-width:0!important;height:34px}
+#work.new-workbench > .card > .tablebox th.sticky-code,
+#work.new-workbench > .card > .tablebox td.sticky-code{position:sticky!important;left:0!important;width:108px;min-width:108px!important;max-width:108px;background:#fff!important;z-index:7}
+#work.new-workbench > .card > .tablebox th.sticky-sku,
+#work.new-workbench > .card > .tablebox td.sticky-sku{position:sticky!important;left:108px!important;width:132px;min-width:132px!important;max-width:132px;background:#fff!important;z-index:7}
+#work.new-workbench > .card > .tablebox th.sticky-code,#work.new-workbench > .card > .tablebox th.sticky-sku{background:#f1efeb!important;z-index:10}
+#work.new-workbench > .card > .tablebox td.meta-cell{min-width:0!important;text-align:left}
+#work.new-workbench > .card > .tablebox td.name-cell{min-width:0!important;width:178px;min-width:178px!important;max-width:178px;overflow:hidden;text-overflow:ellipsis}
+#work.new-workbench > .card > .tablebox td.small-cell{width:44px;min-width:44px!important}
+#work.new-workbench > .card > .tablebox td.total-cell{width:62px;min-width:62px!important}
+#work.new-workbench > .card > .tablebox td.stock-cell{width:54px;min-width:54px!important}
+#work.new-workbench > .card > .tablebox td.store-cell,#work.new-workbench > .card > .tablebox th.group-sub{width:58px;min-width:58px!important}
+#work.new-workbench > .card > .tablebox .qty-input{width:49px;min-width:49px;height:29px;padding:3px 1px;text-align:center;font-size:12px}
+#work.new-workbench > .card > .tablebox .qty-input::-webkit-inner-spin-button{appearance:none}
 #work.new-workbench .store-jump{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:6px 0 10px}
 #work.new-workbench .store-jump button{font-size:12px;padding:6px 9px}
-</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.11</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
+
+/* v0.8.12: 10 metadata columns, first 3 frozen; totals pinned below two header tiers. */
+#work.new-workbench > .card > .tablebox table{table-layout:fixed!important;min-width:0!important}
+#work.new-workbench > .card > .tablebox th,
+#work.new-workbench > .card > .tablebox td{box-sizing:border-box;min-width:0!important;max-width:none;padding:5px 4px!important}
+#work.new-workbench > .card > .tablebox th.sticky-code,
+#work.new-workbench > .card > .tablebox td.sticky-code{left:0!important;width:105px;min-width:105px!important;max-width:105px;z-index:9}
+#work.new-workbench > .card > .tablebox th.sticky-color,
+#work.new-workbench > .card > .tablebox td.sticky-color{position:sticky!important;left:105px!important;width:65px;min-width:65px!important;max-width:65px;background:#fff!important;z-index:9}
+#work.new-workbench > .card > .tablebox th.sticky-size,
+#work.new-workbench > .card > .tablebox td.sticky-size{position:sticky!important;left:170px!important;width:45px;min-width:45px!important;max-width:45px;background:#fff!important;z-index:9}
+#work.new-workbench > .card > .tablebox th.sticky-code,
+#work.new-workbench > .card > .tablebox th.sticky-color,
+#work.new-workbench > .card > .tablebox th.sticky-size{background:#f1efeb!important;z-index:13}
+#work.new-workbench > .card > .tablebox th.new-head-col{height:66px;vertical-align:middle;top:0}
+#work.new-workbench > .card > .tablebox td.name-cell{width:190px;min-width:190px!important;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+#work.new-workbench > .card > .tablebox td.sku-cell{width:132px;min-width:132px!important;max-width:132px}
+#work.new-workbench > .card > .tablebox td.small-cell{width:auto;min-width:0!important}
+#work.new-workbench > .card > .tablebox td.total-cell{width:72px;min-width:72px!important}
+#work.new-workbench > .card > .tablebox td.stock-cell{width:auto;min-width:0!important}
+#work.new-workbench > .card > .tablebox th.group-sub{width:auto;min-width:0!important}
+#work.new-workbench > .card > .tablebox .qty-input{width:48px;min-width:0;height:30px}
+#work.new-workbench > .card > .tablebox .new-total-row td{
+ position:sticky;top:66px;z-index:6;background:#f4efe9!important;font-weight:700;height:34px;border-bottom:2px solid #cab9a7
+}
+#work.new-workbench > .card > .tablebox .new-total-row td.sticky-code,
+#work.new-workbench > .card > .tablebox .new-total-row td.sticky-color,
+#work.new-workbench > .card > .tablebox .new-total-row td.sticky-size{z-index:12;background:#f4efe9!important}
+#work.new-workbench > .card > .tablebox .new-total-row td.new-store-total{background:#eee7dc!important}
+#work.new-workbench > .card > .tablebox td.sticky-code,
+#work.new-workbench > .card > .tablebox td.sticky-color,
+#work.new-workbench > .card > .tablebox td.sticky-size{box-shadow:1px 0 0 #e5dcd4}
+</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.12</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">① 補貨</button><button id="modeNew" onclick="setMode('new')">② 新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub"><b>上傳請移除機密資訊，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數</b></div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div></section>
 <section id="settings" class="card hide"><h2 id="settingsTitle">設定</h2><p class="sub">補貨與新品設定分開保存於目前瀏覽器，沒有同步至雲端。</p><div class="row" id="settingFields"></div><h3>配貨優先順序（最高到最低）</h3><div id="priority"></div><div class="row"><button class="primary" onclick="saveSettings()">儲存設定</button><button onclick="setStep('home')">返回</button></div></section>
@@ -2243,7 +2275,6 @@ function newWorkbenchRender(){
  const groups=new Map();
  rows.forEach((row,index)=>{if(!groups.has(row.spu))groups.set(row.spu,[]);groups.get(row.spu).push({row,index})});
  const activeStores=stores.filter(store=>store!=='大隆'||includeDalong);
- const colspan=8+activeStores.reduce((sum,store)=>sum+newStoreParts(store).length,0);
  const actions=document.getElementById('workActions');
  if(actions)actions.innerHTML='<button class="primary" onclick="approve()">套用</button>'+
   '<button onclick="newInitialize()">初始化</button>'+
@@ -2256,24 +2287,57 @@ function newWorkbenchRender(){
   controls.innerHTML=newZeroMarkup();
  }
  newRenderStoreJump(activeStores);
+ const colWidths=[105,65,45,190,132,65,45,72,55,65];
+ for(const store of activeStores)colWidths.push(...newStoreParts(store).map(t=>t==='需求'?48:58));
+ const table=host.querySelector(':scope > .card > .tablebox > table');
+ if(table){
+  table.style.width=colWidths.reduce((sum,v)=>sum+v,0)+'px';
+  const oldCols=table.querySelector('colgroup.new-col-widths');
+  if(oldCols)oldCols.remove();
+  const colgroup=document.createElement('colgroup');
+  colgroup.className='new-col-widths';
+  colgroup.innerHTML=colWidths.map(width=>'<col style="width:'+width+'px">').join('');
+  table.prepend(colgroup);
+ }
+ const heads=['貨號','顏色','尺寸','品名','品號','顏色','尺寸','叫貨數','庫存','EC剩餘'];
  document.getElementById('thead').innerHTML='<tr>'+
-  ['9 碼貨號','13 碼品號','品名','顏色','尺寸','叫貨總數','庫存','EC 剩餘'].map((t,i)=>'<th rowspan="2" class="'+(i===0?'sticky-code':i===1?'sticky-sku':'')+'">'+t+'</th>').join('')+
+  heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+'</th>').join('')+
   activeStores.map(store=>'<th class="group-head" data-store="'+esc(store)+'" colspan="'+newStoreParts(store).length+'" style="background:'+colors[stores.indexOf(store)]+'">'+esc(store)+'</th>').join('')+
   '</tr><tr>'+activeStores.map(store=>newStoreParts(store).map(label=>
    '<th class="group-sub" style="background:'+colors[stores.indexOf(store)]+'">'+label+'</th>').join('')).join('')+'</tr>';
  const input=(value,ri,store,zone)=>'<input class="qty-input" type="number" min="0" step="1" value="'+value+'" onchange="'+(zone?
   'newSetZone('+ri+',\''+store+'\',\''+zone+'\',this.value)':
   'newSetQty('+ri+','+stores.indexOf(store)+',this.value)')+'">';
- const body=[];
+ // Aggregates: ordered totals are counted once per 9-character group.
+ const orderedTotal=[...groups.values()].reduce((sum,items)=>sum+items.reduce((subtotal,{row})=>subtotal+newDemandTotal(row),0),0);
+ const sumStock=rows.reduce((sum,r)=>sum+Number(r.stock||0),0);
+ const sumRemaining=rows.reduce((sum,r)=>sum+Number(r.stock||0)-newQtyTotal(r),0);
+ const numbers=[orderedTotal,sumStock,sumRemaining];
+ for(const store of activeStores){
+  const si=stores.indexOf(store);
+  numbers.push(rows.reduce((sum,r)=>sum+Number(r.demand[si]||0),0));
+  numbers.push(rows.reduce((sum,r)=>sum+Number(r.qty[si]||0),0));
+  if(newZonePairs[store].length>1){
+   for(const zone of newZonePairs[store])
+    numbers.push(rows.reduce((sum,r)=>sum+Number(newZoneState(r,store).values[zone]||0),0));
+  }
+ }
+ const sumCells=[
+  '<td class="sticky-code">合計</td>','<td class="sticky-color"></td>','<td class="sticky-size"></td>',
+  '<td></td>','<td></td>','<td></td>','<td></td>'
+ ].join('')+numbers.map((n,i)=>'<td class="'+(i<3?'':'new-store-total')+'">'+n+'</td>').join('');
+ const body=['<tr class="new-total-row">'+sumCells+'</tr>'];
  for(const [code,items] of groups){
-  // Only one group-level ordered total is shown, not a fabricated quantity per size.
   const total=items.reduce((sum,{row})=>sum+newDemandTotal(row),0);
   for(let k=0;k<items.length;k++){
    const {row,index}=items[k],used=newQtyTotal(row),left=Number(row.stock||0)-used;
    let cells='';
    if(k===0)cells='<td class="meta-cell sticky-code" rowspan="'+items.length+'"><b>'+esc(code)+'</b></td>';
-   cells+='<td class="meta-cell sticky-sku">'+esc(row.sku)+(row.blocked?' ⛔':'')+'</td>'+
-    '<td class="meta-cell name-cell" title="'+esc(row.name)+'">'+esc(row.name)+'</td><td class="small-cell">'+esc(row.color)+'</td><td class="small-cell">'+esc(row.size)+'</td>';
+   cells+='<td class="small-cell sticky-color">'+esc(row.color)+'</td>'+
+    '<td class="small-cell sticky-size">'+esc(row.size)+'</td>'+
+    '<td class="meta-cell name-cell" title="'+esc(row.name)+'">'+esc(row.name)+'</td>'+
+    '<td class="meta-cell sku-cell">'+esc(row.sku)+(row.blocked?' ⛔':'')+'</td>'+
+    '<td class="small-cell">'+esc(row.color)+'</td><td class="small-cell">'+esc(row.size)+'</td>';
    if(k===0)cells+='<td class="group-total total-cell" rowspan="'+items.length+'">'+total+'</td>';
    cells+='<td class="number-cell stock-cell">'+Number(row.stock||0)+'</td>'+
     '<td class="number-cell stock-cell '+(left<0?'grid-invalid':'')+'">'+left+'</td>';
@@ -2337,8 +2401,14 @@ function newInitialize(){
  if(!confirm('確定要初始化嗎？目前所有人工調整將恢復為本次匯入後的初始狀態，並清除上一步紀錄。'))return;
  newApplySnapshot(newInitialSnapshot);newHistory=[];render();
 }
+function newCompareNineCode(x,y){
+ const a=/^PA(\d+)([A-Z])(\d+)$/i.exec(String(x||'')),b=/^PA(\d+)([A-Z])(\d+)$/i.exec(String(y||''));
+ if(a&&b)return Number(a[1])-Number(b[1])||a[2].toUpperCase().localeCompare(b[2].toUpperCase())||
+  Number(a[3])-Number(b[3])||String(x).localeCompare(String(y),'en');
+ return String(x).localeCompare(String(y),'en',{numeric:true,sensitivity:'base'});
+}
 function newZeroMarkup(){
- const groups=[...new Set(rows.map(r=>r.spu))];
+ const groups=[...new Set(rows.map(r=>r.spu))].sort(newCompareNineCode);
  return '<details '+(newZeroExpanded?'open':'')+' ontoggle="newZeroExpanded=this.open">'+
   '<summary style="cursor:pointer;font-weight:700;padding:11px 10px">當次新品歸零勾選（'+groups.length+' 組貨號）</summary>'+
   '<div class="tablebox" style="max-height:42vh"><table class="zero-table" style="min-width:550px"><thead>'+
@@ -2403,7 +2473,7 @@ function newRenderStoreJump(activeStores){
   '<button style="background:'+colors[stores.indexOf(store)]+'" onclick="newJumpStore(\''+store+'\')">'+esc(store)+'</button>').join('');
 }
 function newJumpStore(store){
- const table=document.querySelector('#work.new-workbench .tablebox');
+ const table=document.querySelector('#work.new-workbench > .card > .tablebox');
  const th=[...document.querySelectorAll('#work.new-workbench th.group-head')].find(el=>el.dataset.store===store);
  if(!table||!th)return;
  const pos=th.getBoundingClientRect().left-table.getBoundingClientRect().left+table.scrollLeft-250;
