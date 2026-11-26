@@ -52,7 +52,7 @@ async function guideReadSheet(file,index){
  return file.kind==='demand'?impDemandTable(data,file.name+' / '+tab.name):impStockTable(data,file.name+' / '+tab.name);
 }
 function guideHeader(data,kind,source){
- const found=data.findIndex((row,i)=>i<35&&row.some(v=>/^(條碼|SKU|品號|貨號)$/i.test(String(v||'').trim()))&&
+ const found=data.findIndex((row,i)=>i<35&&row.some(v=>/^(條碼|SKU|品號|貨號|\*貨號\(13碼\))$/i.test(String(v||'').trim()))&&
  (kind==='stock'?row.some(v=>/^(庫存|現貨庫存|可用庫存|庫存數量|現貨數量|可配庫存)$/i.test(String(v||'').trim())):
  row.some(v=>/補貨需求|營運確認數|叫貨數量|^數量$|^需求$|^(信義|西門|ATT|文心|南西|光復|民族|板橋|大隆)/i.test(String(v||'').trim()))));
  if(found<0)throw Error(source+'：缺少可辨識的貨號與'+(kind==='stock'?'庫存':'需求')+'表頭');
@@ -106,7 +106,7 @@ impDemandTable=function(data,source){
 };
 impStockTable=function(data,source){
  const {head,records}=guideHeader(data,'stock',source);
- const skuCol=guideIndex(head,/^(條碼|SKU|品號|商品SKU|商品編號)$/i);
+ const skuCol=guideIndex(head,/^(條碼|SKU|品號|商品SKU|商品編號|\*貨號\(13碼\))$/i);
  const alternative=guideIndex(head,/^(貨號|9碼貨號)$/i);
  const stockCol=guideIndex(head,/^(庫存|現貨庫存|可用庫存|庫存數量|現貨數量|可配庫存)$/i);
  const skuIndex=skuCol>=0?skuCol:alternative;
