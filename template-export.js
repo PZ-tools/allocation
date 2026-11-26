@@ -23,40 +23,40 @@ function localTemplateOperation(type,key,value){
 }
 function displayTemplateStatus(note=''){
  const e=document.getElementById('templateInfo');if(!e)return;
- const labels=[['信義:warehouse','信義實業・1F倉庫'],['ATT:warehouse','ATT美學・B1F倉庫'],['ATT:display','ATT美學・1F陳列']];
+ const labels=[['實業','實業轉撥單模版'],['美學','美學平台資料模版']];
  e.innerHTML='<b>本機範本狀態：</b>'+labels.map(([key,name])=>{
   const f=originalTemplateFiles.get(key);return '<span class="pill">'+name+'：'+(f?'✓ 已保存':'尚未設定')+'</span>'
- }).join('')+'<div class="sub">'+(note||'首次選取一次後會保存在目前裝置的瀏覽器，下次可直接使用；換裝置、無痕模式或清除網站資料可能需要重選。')+'</div>';
+ }).join('')+'<div class="sub">'+(note||'兩份範本各設定一次，之後於相同瀏覽器自動沿用；換裝置或清除網站資料時須重選。')+'</div>';
 }
 async function restoreOriginalTemplates(){
  try{
-  const labels=['信義:warehouse','ATT:warehouse','ATT:display'];
-  for(const key of labels){const value=await localTemplateOperation('get',key);if(value instanceof Blob)originalTemplateFiles.set(key,value)}
+  for(const key of ['實業','美學']){const v=await localTemplateOperation('get','format:'+key);if(v instanceof Blob)originalTemplateFiles.set(key,v)}
   displayTemplateStatus();
- }catch(err){displayTemplateStatus('本機保存無法使用：本次可選取範本，但下次可能需重新選取。')}
+ }catch(err){displayTemplateStatus('無法讀取本機範本：本次可手動選取，後續可能需要重選。')}
 }
 templateReadyPromise=restoreOriginalTemplates();
 async function inspectOriginalTemplates(event){
  await templateReadyPromise;
- const input=event.target;const selected=Array.from(input.files||[]);
+ const input=event.target,selected=Array.from(input.files||[]);
  if(!selected.length)return;
- let added=0,failed=[];
+ const failed=[];let added=0;
  for(const file of selected){
-  if(!/\.xlsx$/i.test(file.name)){failed.push(file.name+'（非 xlsx）');continue}
-  const key=/PA\s*信義店/.test(file.name)?'信義':(/PA\s*ATT店/i.test(file.name)?'ATT':null);
-  if(!key){failed.push(file.name+'（尚未支援此門市範本）');continue}
-  const kind=/陳列/.test(file.name)?'display':'warehouse';
-  const id=key+':'+kind;
-  originalTemplateFiles.set(id,file);added++;
-  try{await localTemplateOperation('put',id,file)}catch(e){failed.push(file.name+'（本機保存失敗，僅本次可使用）')}
+  if(!/\\.xlsx$/i.test(file.name)){failed.push(file.name+'（不是 xlsx）');continue}
+  try{
+   const type=await identifyOriginalWorkbook(file);
+   if(!type){failed.push(file.name+'（欄位不符合實業或美學正式範本）');continue}
+   originalTemplateFiles.set(type,file);added++;
+   try{await localTemplateOperation('put','format:'+type,file)}catch(e){failed.push(file.name+'（可本次使用，但保存至本機失敗）')}
+  }catch(err){failed.push(file.name+'（'+err.message+'）')}
  }
- displayTemplateStatus(added?'本次新增／取代 '+added+' 份範本。'+(failed.length?'注意：'+failed.join('；'):''):(failed.join('；')||'沒有辨識到可用範本'));
+ displayTemplateStatus((added?'已設定 '+added+' 種原始範本。':'沒有新增可用範本。')+(failed.length?' '+failed.join('；'):''));
  input.value='';
 }
 async function clearLocalTemplates(){
- if(!confirm('確定清除儲存在本裝置瀏覽器的原始 Excel 範本？'))return;
+ if(!confirm('確定清除本裝置已保存的原始 Excel 範本？'))return;
  await templateReadyPromise;
- try{await localTemplateOperation('clear');originalTemplateFiles.clear();displayTemplateStatus('已清除本機保存的範本。')}catch(e){alert('清除本機範本失敗：'+e.message)}
+ try{await localTemplateOperation('clear');originalTemplateFiles.clear();displayTemplateStatus('已清除本機範本。')}
+ catch(e){alert('清除失敗：'+e.message)}
 }
 function u16(d,o){return d[o]|d[o+1]<<8}
 function u32(d,o){return (d[o]|d[o+1]<<8|d[o+2]<<16|d[o+3]<<24)>>>0}
@@ -128,8 +128,8 @@ async function outputFromOriginal(file,records,type){
  const data=doc.getElementsByTagNameNS(ns,'sheetData')[0];
  if(!data)throw Error('工作表缺少 sheetData');
  const original=Array.from(data.getElementsByTagNameNS(ns,'row'));
- if(original.length<2)throw Error('原始工作表缺少商品範例列');
- const first=original[1],header=original[0];
+ if(original.length<1)throw Error('原始工作表缺少表頭');
+ const header=original[0],first=original[1]||doc.createElementNS(ns,'row');
  const sharedEntry=entries.find(x=>x.name==='xl/sharedStrings.xml');
  let shared=[];
  if(sharedEntry){
@@ -138,6 +138,7 @@ async function outputFromOriginal(file,records,type){
  }
  const headerVals=Array.from(header.getElementsByTagNameNS(ns,'c')).map(c=>{
   const v=c.getElementsByTagNameNS(ns,'v')[0]?.textContent||'';
+  if(c.getAttribute('t')==='inlineStr')return c.getElementsByTagNameNS(ns,'is')[0]?.textContent||'';
   return c.getAttribute('t')==='s'?shared[Number(v)]:v;
  });
  const expected=type==='信義'?['單別','單號','轉出廠別','單據日期','單別','單號','序號','品號','品名','規格','數量','轉出庫','轉入庫','確認碼']:['品號','數量','是否為贈品(若是請寫Y)','單價(微日、賣鬧適用)'];
@@ -163,6 +164,31 @@ async function outputFromOriginal(file,records,type){
  target.data=out;target.method=0;target.usize=out.length;target.csize=out.length;target.crc=crc(out);
  return zipRepack(entries);
 }
+async function identifyOriginalWorkbook(file){
+ const bytes=new Uint8Array(await file.arrayBuffer()),entries=zipRead(bytes);
+ const target=entries.find(x=>x.name==='xl/worksheets/sheet1.xml');
+ if(!target)throw Error('找不到原始工作表');
+ const doc=new DOMParser().parseFromString(dec.decode(await uncompressed(target)),'application/xml');
+ if(doc.querySelector('parsererror'))throw Error('Excel XML 無法解析');
+ const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+ const first=doc.getElementsByTagNameNS(ns,'row')[0];if(!first)return null;
+ const sharedEntry=entries.find(x=>x.name==='xl/sharedStrings.xml');
+ let shared=[];
+ if(sharedEntry){
+  const sd=new DOMParser().parseFromString(dec.decode(await uncompressed(sharedEntry)),'application/xml');
+  shared=Array.from(sd.getElementsByTagNameNS(ns,'si')).map(x=>x.textContent||'');
+ }
+ const cells=Array.from(first.getElementsByTagNameNS(ns,'c'));
+ const values=cells.map(c=>{
+  const v=c.getElementsByTagNameNS(ns,'v')[0]?.textContent||'';
+  return c.getAttribute('t')==='inlineStr'?(c.getElementsByTagNameNS(ns,'is')[0]?.textContent||''):(c.getAttribute('t')==='s'?shared[Number(v)]:v);
+ });
+ const sy=['單別','單號','轉出廠別','單據日期','單別','單號','序號','品號','品名','規格','數量','轉出庫','轉入庫','確認碼'];
+ const my=['品號','數量','是否為贈品(若是請寫Y)','單價(微日、賣鬧適用)'];
+ if(sy.every((x,i)=>values[i]===x))return '實業';
+ if(my.every((x,i)=>values[i]===x))return '美學';
+ return null;
+}
 function downloadWorkbook(blob,name){
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
  setTimeout(()=>URL.revokeObjectURL(a.href),15000);
@@ -170,38 +196,53 @@ function downloadWorkbook(blob,name){
 async function downloadTemplateBasedFiles(){
  try{
   await templateReadyPromise;
-  if(!originalTemplateFiles.size){document.getElementById('originalTemplates')?.focus();displayTemplateStatus('尚未設定原始 Excel 範本。請使用上方「選擇範本」一次設定，系統不會自動從 ChatGPT 附件取得檔案。');return;}
-  if(!rows.length)throw Error('尚無配貨資料');
-  const per=new Set(rows.map(r=>r.period).filter(Boolean));
-  if(per.size>1)throw Error('多個不同檔期需分開產生檔案');
-  const period=[...per][0]||'測試';
-  const details=[];
-  for(const store of ['信義','ATT']){
-   const storeIdx=stores.indexOf(store);
-   const split=(store==='信義')?[['1F倉庫',null]]:[['B1F倉庫','warehouse'],['1F陳列','display']];
-   for(const [zone,kind] of split){
-    const t=originalTemplateFiles.get(store+':'+(kind||'warehouse'));
-    const records=[];
-    for(const r of rows){
-     const qty=r.qty[storeIdx]||0;if(!qty)continue;
-     let n=qty;
-     if(store==='ATT'){
-      const size=String(r.size||r.sku.split('-').pop()).toUpperCase();
-      if(!['S','M','L','F','XS','XL','XXL'].includes(size))throw Error('SKU '+r.sku+' 缺少可識別尺寸，陳列數量不能猜測');
-      const display=Math.min(qty,1);n=kind==='display'?display:qty-display;
-     }
-     if(n)records.push({sku:r.sku,qty:n,name:r.name,color:r.color,size:r.size||r.sku.split('-').pop()});
+  const missing=['實業','美學'].filter(key=>!originalTemplateFiles.has(key));
+  if(missing.length){displayTemplateStatus('尚缺：'+missing.join('、')+' 範本。請使用上方選擇檔案；只需要這兩種，不需要每家門市各上傳一份。');return}
+  if(!rows.length)throw Error('沒有配貨資料');
+  const periodSet=new Set(rows.map(r=>r.period).filter(Boolean));
+  if(periodSet.size>1)throw Error('不同檔期需分開打單');
+  const period=[...periodSet][0]||'測試';
+  const recordsByFile=new Map();
+  for(const r of rows){
+   const size=String(r.size||r.sku.split('-').pop()).toUpperCase();
+   for(let i=0;i<stores.length;i++){
+    const q=r.qty[i]||0;if(q===0)continue;
+    const store=stores[i];
+    let zones;
+    if(store==='信義')zones={'1F倉庫':q};
+    else if(store==='光復'){
+      if(mode==='restock')throw Error('光復補貨 2F／3F 倉庫分配未提供，請先確認原始分倉數量，不能自動猜測');
+      zones={'2F倉庫':q};
+    }else if(store==='大隆')zones={'2F倉庫':q};
+    else if(mode==='restock'){
+      throw Error(store+' 補貨未提供倉庫／陳列的分配數量，無法安全輸出分區打單檔');
+    }else{
+      if(!['S','M','L','F','XS','XL','XXL'].includes(size))throw Error('商品 '+r.sku+' 缺少尺寸，無法判斷陳列件數');
+      const pair={西門:['4F倉庫','2F陳列'],ATT:['B1F倉庫','1F陳列'],文心:['2F倉庫','1F陳列'],南西:['1F倉庫','1F陳列'],民族:['1F倉庫','1F陳列'],板橋:['1F倉庫','1F陳列']}[store];
+      if(!pair)throw Error('找不到 '+store+' 的新品分倉設定');
+      const display=Math.min(q,store==='南西'?(size==='L'?1:2):1);
+      zones={[pair[0]]:q-display,[pair[1]]:display};
     }
-    if(!records.length)continue;
-    if(!t){displayTemplateStatus('尚缺「'+store+' '+zone+'」原始匯入範本，請從上方選擇檔案。');return;}
-    const xlsx=await outputFromOriginal(t,records,store);
-    const filename=(store==='ATT'?'PA ATT':'PA信義')+'店_'+zone+'_'+period+(mode==='new'?'新品':'補貨')+'.xlsx';
-    details.push({blob:xlsx,name:filename,count:records.reduce((a,r)=>a+r.qty,0)});
+    for(const [zone,num] of Object.entries(zones)){
+     if(num<=0)continue;
+     const key=store+'|'+zone;
+     if(!recordsByFile.has(key))recordsByFile.set(key,[]);
+     recordsByFile.get(key).push({sku:r.sku,qty:num,name:r.name||'',color:r.color||'',size});
+    }
    }
   }
-  if(!details.length)throw Error('目前無信義／ATT 可輸出的配貨數量');
-  for(const file of details)downloadWorkbook(file.blob,file.name);
-  const box=document.getElementById('exportStatus');
-  if(box)box.textContent='已根據原始範本產出 '+details.length+' 份 Excel（'+details.reduce((s,x)=>s+x.count,0)+' 件）。本輪只支援已提供原檔的信義與 ATT；其他七家未提供對應範本，不能擅自生成正式檔。公司系統匯入仍待驗證。';
- }catch(e){alert('原始範本匯出停止：'+e.message)}
+  const files=[],expected=rows.reduce((a,r)=>a+r.qty.reduce((x,y)=>x+y,0),0);
+  for(const [key,rec] of recordsByFile.entries()){
+   const [store,zone]=key.split('|'),system=store==='信義'?'實業':'美學';
+   const blob=await outputFromOriginal(originalTemplateFiles.get(system),rec,store==='信義'?'信義':'美學');
+   const prefix=store==='ATT'?'PA ATT':'PA'+store;
+   const name=prefix+'店_'+zone+'_'+period+(mode==='new'?'新品':'補貨')+'.xlsx';
+   files.push({blob,name,count:rec.reduce((a,x)=>a+x.qty,0)});
+  }
+  const actual=files.reduce((a,x)=>a+x.count,0);
+  if(actual!==expected)throw Error('輸出總件數 '+actual+' 與核准總件數 '+expected+' 不一致，已中止');
+  if(!files.length)throw Error('沒有非零配貨數，無可輸出檔案');
+  for(const f of files)downloadWorkbook(f.blob,f.name);
+  document.getElementById('exportStatus').textContent='已依兩份原始範本產出 '+files.length+' 份 Excel，共 '+actual+' 件。公司系統正式匯入仍待驗證。';
+ }catch(err){alert('原始範本匯出停止：'+err.message)}
 }
