@@ -8,6 +8,49 @@ function guide9(row,head,barcode){
  const v=String(barcode||'').trim().toUpperCase();
  return /^[A-Z0-9]{13}$/.test(v)?v.slice(0,9):'';
 }
+async function guideOpenWorkbook(file){
+ const entries=zipRead(new Uint8Array(await file.arrayBuffer()));
+ const find=name=>entries.find(e=>e.name===name);
+ const workbook=find('xl/workbook.xml');if(!workbook)throw Error('XLSX 缺少活頁簿');
+ const parse=async e=>{
+  const doc=new DOMParser().parseFromString(dec.decode(await uncompressed(e)),'application/xml');
+  if(doc.querySelector('parsererror'))throw Error('Excel XML 解析失敗');return doc;
+ };
+ const wb=await parse(workbook);
+ const rns='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+ const sheetElements=Array.from(wb.getElementsByTagNameNS('http://schemas.openxmlformats.org/spreadsheetml/2006/main','sheet'));
+ const rels=new Map(), relFile=find('xl/_rels/workbook.xml.rels');
+ if(relFile){const doc=await parse(relFile);for(const e of Array.from(doc.getElementsByTagName('Relationship')))rels.set(e.getAttribute('Id'),e.getAttribute('Target'))}
+ const tabs=sheetElements.map((e,i)=>{
+  let target=rels.get(e.getAttributeNS(rns,'id'))||('worksheets/sheet'+(i+1)+'.xml');
+  target=target.replace(/^\/?xl\//,'').replace(/^\/+/,'');
+  return {name:e.getAttribute('name')||('工作表'+(i+1)),entry:find('xl/'+target)};
+ }).filter(x=>x.entry);
+ return {entries,tabs,shared:null,find,parse};
+}
+async function guideReadSheet(file,index){
+ const book=file.book,tab=book.tabs[index];if(!tab)throw Error('找不到選定工作表');
+ const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+ if(book.shared===null){
+  const e=book.find('xl/sharedStrings.xml');
+  book.shared=e?Array.from((await book.parse(e)).getElementsByTagNameNS(ns,'si')).map(x=>x.textContent||''):[];
+ }
+ const doc=await book.parse(tab.entry),data=[];
+ const sheetData=doc.getElementsByTagNameNS(ns,'sheetData')[0];
+ if(!sheetData)throw Error('選定工作表沒有資料');
+ for(const row of Array.from(sheetData.getElementsByTagNameNS(ns,'row'))){
+  const cells=[];
+  for(const cell of Array.from(row.getElementsByTagNameNS(ns,'c'))){
+   const a=/^[A-Z]+/.exec(cell.getAttribute('r')||'')?.[0];if(!a)continue;
+   let i=0;for(const ch of a)i=i*26+ch.charCodeAt(0)-64;i--;
+   const v=cell.getElementsByTagNameNS(ns,'v')[0]?.textContent||'';
+   const t=cell.getAttribute('t');
+   cells[i]=t==='s'?(book.shared[Number(v)]||''):t==='inlineStr'?(cell.getElementsByTagNameNS(ns,'is')[0]?.textContent||''):String(v);
+  }
+  if(cells.some(x=>String(x||'').trim()))data.push(cells);
+ }
+ return file.kind==='demand'?impDemandTable(data,file.name+' / '+tab.name):impStockTable(data,file.name+' / '+tab.name);
+}
 function guideHeader(data,kind,source){
  const found=data.findIndex((row,i)=>i<35&&row.some(v=>/^(條碼|SKU|品號|貨號)$/i.test(String(v||'').trim()))&&
  (kind==='stock'?row.some(v=>/^(庫存|現貨庫存|可用庫存|庫存數量|現貨數量|可配庫存)$/i.test(String(v||'').trim())):
@@ -91,6 +134,7 @@ function guideNext(target){
   if(!importState.demand.some(f=>f.entries.length)||guideDemandIssues().length){guideAlert('請完成工作表選擇及需求核對');return}
  }
  if(target===3&&!guideList().length){guideAlert('尚無可查詢的 9 碼貨號');return}
+ if(target===3&&mode==='new'&&!newConfirmed){guideAlert('請先確認本次新品配貨門市');return}
  if(target===4){
   const t=impTotals();if(!t.demand.length||!t.stock.length||t.warnings.length||importState.errors.length){guideAlert('請先完成需求與庫存比對');return}
  }
@@ -198,7 +242,7 @@ function guideMount(){
  const home=document.getElementById('home'),panel=document.getElementById('importPanel');
  if(!home||!panel)return;
  const wrapper=panel.parentElement;wrapper.style.display='none';
- const first=home.querySelector('.row:not(#newEntry .row)');
+ const first=Array.from(home.querySelectorAll('.row')).find(x=>!x.closest('#newEntry')&&!x.closest('#importPanel'));
  if(first&&first.closest('#home')===home){
   const tools=document.createElement('details');tools.className='guide-tools';
   tools.innerHTML='<summary>測試工具</summary>';
