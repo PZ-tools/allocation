@@ -1110,6 +1110,8 @@ const newDefaultStores=['信義','西門','ATT','文心','南西','光復','民�
 let settingsSection='common', newConfirmed=false, includeDalong=false, zeroReasons={};
 const commonKey='pz-common-priority-v1', capKey='pz-new-sku-cap-v1';
 let commonPriority=saved.restock.priority.slice(),skuCap={kind:'percent',value:50};
+const xinyiRuleKey='pz-xinyi-restock-rule-v1';
+let xinyiRule=localStorage.getItem(xinyiRuleKey)==='normal'?'normal':'unrestricted';
 try{const v=JSON.parse(localStorage.getItem(commonKey)||'null');if(Array.isArray(v)&&v.length===stores.length&&stores.every(s=>v.includes(s)))commonPriority=v}catch(e){}
 try{const v=JSON.parse(localStorage.getItem(capKey)||'null');if(v&&['percent','count'].includes(v.kind)&&Number.isInteger(v.value)&&v.value>=0&&(v.kind!=='percent'||v.value<=100))skuCap=v}catch(e){}
 function saveCommonOrder(){
@@ -1121,23 +1123,44 @@ function saveCommonOrder(){
 savePriority=saveCommonOrder;
 cap=function(r){
  const stock=Math.max(0,Math.floor(Number(r.stock)||0));
- if(mode==='restock')return Math.max(0,stock-Number(saved.restock.safe||0));
+ if(mode==='restock')return xinyiRule==='unrestricted'?stock:Math.max(0,stock-Number(saved.restock.safe||0));
  return skuCap.kind==='percent'?Math.floor(stock*skuCap.value/100):Math.min(stock,skuCap.value);
 };
+function xinyiRestockViolation(r){
+ if(mode!=='restock'||xinyiRule!=='unrestricted')return false;
+ const budget=Math.max(0,Number(r.stock||0)-Number(saved.restock.safe||0));
+ const other=stores.reduce((sum,store,i)=>sum+(store==='信義'?0:Number(r.qty[i]||0)),0);
+ return other>budget||r.qty.reduce((a,b)=>a+Number(b||0),0)>r.stock;
+}
 allocate=function(){
  for(const r of rows){
   if(r.blocked){r.qty=stores.map(()=>0);continue}
-  const available=cap(r);
-  r.qty=stores.map((s,i)=>mode==='new'&&s==='大隆'&&!includeDalong?0:r.demand[i]||0);
-  let used=r.qty.reduce((a,b)=>a+b,0);
-  for(const store of [...commonPriority].reverse()){
-   if(used<=available)break;
-   const i=stores.indexOf(store),cut=Math.min(r.qty[i],used-available);
-   r.qty[i]-=cut;used-=cut;
+  const stock=Math.max(0,Math.floor(Number(r.stock)||0));
+  const generalLimit=Math.max(0,stock-Number(saved.restock.safe||0));
+  const totalLimit=mode==='new'?cap(r):xinyiRule==='unrestricted'?stock:generalLimit;
+  const proposed=stores.map((store,i)=>mode==='new'&&store==='大隆'&&!includeDalong?0:Number(r.demand[i]||0));
+  const allocated=stores.map(()=>0);
+  let left=totalLimit,spentGeneral=0;
+  for(const store of commonPriority){
+   const index=stores.indexOf(store);if(index<0)continue;
+   const desired=proposed[index];
+   const special=mode==='restock'&&xinyiRule==='unrestricted'&&store==='信義';
+   const budget=special?left:mode==='restock'?Math.min(left,Math.max(0,generalLimit-spentGeneral)):left;
+   const q=Math.min(desired,budget);
+   allocated[index]=q;left-=q;
+   if(mode==='restock'&&!special)spentGeneral+=q;
   }
-  if(used>available)r.qty=stores.map(()=>0);
+  r.qty=allocated;
  }
  suggested=rows.map(r=>r.qty.slice());render();
+};
+const xinyiApproveBase=approve;
+approve=function(){
+ if(rows.some(xinyiRestockViolation)){
+  alert('信義補貨規則驗證失敗：一般門市配貨不得使用官網安全庫存');
+  return;
+ }
+ xinyiApproveBase();
 };
 const baseSetMode082=setMode;
 setMode=function(m){baseSetMode082(m);newConfirmed=false;includeDalong=false;zeroReasons={};renderNewEntry()};
@@ -1206,8 +1229,18 @@ function settingsTab(tab){settingsSection=tab;renderSettings()}
 function saveSafety082(){
  const n=Number(document.getElementById('safe')?.value);
  if(!Number.isInteger(n)||n<0){alert('安全庫存必須是非負整數');return}
- saved.restock.safe=n;localStorage.setItem('pz-test-settings',JSON.stringify(saved));
- document.getElementById('settingsFeedback').textContent='安全庫存已儲存';
+ saved.restock.safe=n;
+ const selected=document.querySelector('input[name="xinyiRestockRule"]:checked')?.value;
+ if(!['unrestricted','normal'].includes(selected)){alert('請選擇信義補貨規則');return}
+ xinyiRule=selected;
+ localStorage.setItem(xinyiRuleKey,xinyiRule);
+ localStorage.setItem('pz-test-settings',JSON.stringify(saved));
+ document.getElementById('settingsFeedback').textContent='補貨設定已儲存';
+}
+function updateSkuLimitLabel(){
+ const kind=document.getElementById('capKind')?.value;
+ document.getElementById('skuCapLabel').textContent=kind==='percent'?'最多可配比例':'每個 SKU 最多可配件數';
+ document.getElementById('skuCapUnit').textContent=kind==='percent'?'%':'件';
 }
 function saveSkuCap082(){
  const kind=document.getElementById('capKind')?.value,n=Number(document.getElementById('capNumber')?.value);
@@ -1242,12 +1275,15 @@ renderSettings=function(){
   priorityDraft=commonPriority.slice();prio.innerHTML='';renderPriority();
   footer.innerHTML='<button class="primary" onclick="saveCommonOrder()">儲存排序</button><span class="sub" id="prioritySaveState"></span><button onclick="setStep(\'home\')">返回</button>';
  }else if(settingsSection==='restock'){
-  fields.innerHTML=tabs+'<div class="box" style="width:100%"><h3>補貨</h3><label>官網安全庫存 <input type="number" id="safe" min="0" step="1" value="'+saved.restock.safe+'"></label><p class="sub">安全庫存即配貨門檻。</p></div>';
-  prio.innerHTML='';footer.innerHTML='<button class="primary" onclick="saveSafety082()">儲存安全庫存</button><span class="sub" id="settingsFeedback"></span><button onclick="setStep(\'home\')">返回</button>';
+  fields.innerHTML=tabs+'<div class="box" style="width:100%"><h3>補貨</h3><label>官網安全庫存 <input type="number" id="safe" min="0" step="1" value="'+saved.restock.safe+'"> 件</label>'+
+   '<hr><h4>信義店｜特殊補貨規則</h4>'+
+   '<label style="display:flex;gap:7px;align-items:center;margin:9px 0"><input type="radio" name="xinyiRestockRule" value="unrestricted" '+(xinyiRule==='unrestricted'?'checked':'')+'>不受限制</label>'+
+   '<label style="display:flex;gap:7px;align-items:center;margin:9px 0"><input type="radio" name="xinyiRestockRule" value="normal" '+(xinyiRule==='normal'?'checked':'')+'>按照規則</label></div>';
+  prio.innerHTML='';footer.innerHTML='<button class="primary" onclick="saveSafety082()">儲存補貨設定</button><span class="sub" id="settingsFeedback"></span><button onclick="setStep(\'home\')">返回</button>';
  }else{
-  fields.innerHTML=tabs+'<div class="box" style="width:100%"><h3>新品</h3><p class="sub">每個 SKU 獨立設定配貨上限。</p>'+
-  '<div class="row"><label>計算方式 <select id="capKind"><option value="percent" '+(skuCap.kind==='percent'?'selected':'')+'>百分比 %</option><option value="count" '+(skuCap.kind==='count'?'selected':'')+'>固定件數</option></select></label>'+
-  '<label>SKU 上限 <input type="number" min="0" step="1" id="capNumber" value="'+skuCap.value+'"></label></div></div>';
+  fields.innerHTML=tabs+'<div class="box" style="width:100%"><h3>新品｜庫存配貨上限</h3>'+
+  '<div class="row"><label>計算方式 <select id="capKind" onchange="updateSkuLimitLabel()"><option value="percent" '+(skuCap.kind==='percent'?'selected':'')+'>庫存百分比</option><option value="count" '+(skuCap.kind==='count'?'selected':'')+'>固定件數</option></select></label>'+
+  '<label><span id="skuCapLabel">'+(skuCap.kind==='percent'?'最多可配比例':'每個 SKU 最多可配件數')+'</span> <input type="number" min="0" step="1" id="capNumber" value="'+skuCap.value+'"> <span id="skuCapUnit">'+(skuCap.kind==='percent'?'%':'件')+'</span></label></div></div>';
   prio.innerHTML='';footer.innerHTML='<button class="primary" onclick="saveSkuCap082()">儲存新品上限</button><span class="sub" id="settingsFeedback"></span><button onclick="setStep(\'home\')">返回</button>';
  }
 };
