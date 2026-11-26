@@ -960,6 +960,32 @@ importCsv=function(event){
 };
 
 /* v0.8.0: replace legacy export with explicit per-SKU zone routing and single ZIP. */
+function mergeXinyiPackingRecords(records){
+ const list=[],bySku=new Map();
+ const before=records.reduce((sum,r)=>sum+Number(r.qty||0),0);
+ for(const source of records){
+  const sku=String(source.sku||'').trim().toUpperCase();
+  if(!sku)throw Error('信義打單品號不可空白');
+  if(!allocationTestOnly&&!/^[A-Z0-9]{13}$/.test(sku))
+   throw Error('信義打單品號需完整 13 碼：'+sku);
+  const qty=Number(source.qty);
+  if(!Number.isInteger(qty)||qty<0)throw Error('信義打單品號 '+sku+' 數量無效');
+  const fields=['name','color','size'];
+  const current=bySku.get(sku);
+  if(current){
+   if(fields.some(k=>String(current[k]||'').trim()!==String(source[k]||'').trim()))
+    throw Error('信義同品號 '+sku+' 的品名／顏色／尺寸不一致，已中止匯出');
+   current.qty+=qty;
+  }else{
+   const item={...source,sku,qty};
+   list.push(item);bySku.set(sku,item);
+  }
+ }
+ const after=list.reduce((sum,r)=>sum+r.qty,0);
+ if(before!==after||new Set(list.map(r=>r.sku)).size!==list.length)
+  throw Error('信義品號合併後數量或唯一性驗證失敗');
+ return list;
+}
 downloadTemplateBasedFiles=async function(){
  try{
   await templateReadyPromise;
@@ -995,8 +1021,9 @@ downloadTemplateBasedFiles=async function(){
   const expected=rows.reduce((sum,r)=>sum+r.qty.reduce((a,b)=>a+b,0),0);
   if(!expected)throw Error('目前配貨總件數為 0，沒有打單檔案');
   const files=[];
-  for(const [key,rec] of fileRows.entries()){
+  for(const [key,originalRecords] of fileRows.entries()){
    const [store,zone]=key.split('|'),system=store==='信義'?'實業':'美學';
+   const rec=store==='信義'?mergeXinyiPackingRecords(originalRecords):originalRecords;
    const blob=await outputFromOriginal(originalTemplateFiles.get(system),rec,store==='信義'?'信義':'美學');
    const count=rec.reduce((a,x)=>a+x.qty,0);
    const verified=await verifyExportedWorkbook(blob,rec.length,count,store==='信義'?'信義':'美學');
