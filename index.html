@@ -236,7 +236,7 @@ function renderLineNotices(){
    uncertain=config.zones.length>1;
    if(config.zones.length===1)zones[config.zones[0]]=total;
   }
-  if(uncertain)warnings.push(store+'：倉庫／陳列拆分待確認（總件數 '+total+'）');
+  if(uncertain)warnings.push(store+'：倉庫／陳列拆分待確認');
   const lines=config.zones.map(z=>'PA'+(store==='ATT'?' ATT':store)+'店_'+z+'_'+kind+'(共'+(uncertain?'待確認':fmtLineCount(zones[z]))+'件)');
   const body=(date?'到貨日：'+date+'\n':'')+lines.join('\n')+'\n'+config.time;
   sections.push(body);
