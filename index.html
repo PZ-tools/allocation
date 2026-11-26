@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>配貨小幫手GOGOGO｜測試版</title><style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;color:#302b29;background:#faf8f6}*{box-sizing:border-box}body{margin:0}header{background:#fff;border-bottom:1px solid #e8e1da;padding:16px 4%;display:flex;align-items:center;justify-content:space-between;gap:10px}h1{font-size:21px;margin:0}small,.muted{color:#817872}.badge{background:#f9eadd;padding:7px 10px;border-radius:20px;font-size:12px}main{max-width:1500px;margin:auto;padding:20px 4%}button,input,select,textarea{font:inherit}button{background:white;border:1px solid #d8cbc0;border-radius:10px;padding:10px 14px;cursor:pointer;color:#342d29}button.primary{background:#44372f;color:#fff;border-color:#44372f}button.active{background:#f3e7dc;border-color:#a78b75;font-weight:700}.tabs{display:flex;gap:9px;flex-wrap:wrap;margin:20px 0}.card{background:#fff;padding:18px;border:1px solid #e9e1db;border-radius:15px;margin:15px 0}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}.row label{display:flex;gap:5px;align-items:center}input[type=number]{width:80px;padding:8px;border:1px solid #ddd0c9;border-radius:8px}input[type=text],input[type=file],select{padding:8px;border:1px solid #ddd0c9;border-radius:8px;max-width:100%}h2{font-size:19px;margin:4px 0 14px}h3{font-size:15px}.pill{display:inline-block;border-radius:30px;background:#f3efe9;padding:5px 10px;margin:3px;font-size:12px}table{border-collapse:separate;border-spacing:0;min-width:1120px;width:100%;font-variant-numeric:tabular-nums}th,td{border-bottom:1px solid #ece6e1;border-right:1px solid #f0ece9;text-align:center;padding:9px 6px;white-space:nowrap}th{position:sticky;top:0;z-index:3;background:#f1efeb}th:first-child,td:first-child{position:sticky;left:0;z-index:5;background:#fff;min-width:142px;text-align:left}th:nth-child(2),td:nth-child(2){position:sticky;left:142px;z-index:4;background:#fff;min-width:68px}th:first-child,th:nth-child(2){background:#f0eeec;z-index:7} .spu-line{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:8px 0;border-bottom:1px solid #ece6e1}.spu-line label{display:inline-flex;align-items:center;gap:5px}.spu-line .spu-id{min-width:175px;font-weight:700}.spu-line .sku-items{display:flex;flex-wrap:wrap;gap:5px}.spu-line .sku-items label{padding:5px 8px;border-radius:20px;background:#f3efe9;font-size:12px}.spu-line .sku-items label:has(input:disabled){opacity:.45}td input[type=number]{width:61px;padding:6px;text-align:center}th.store{background:var(--tint)}.tablebox{max-height:62vh;overflow:auto;border:1px solid #e5dcd4;border-radius:9px}.warn{background:#fff2ec;border:1px solid #f0c7b1;color:#8e422f;padding:12px;border-radius:9px}.ok{color:#347751}.error{color:#b14436;font-weight:bold}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:11px}.hide{display:none}.sub{font-size:13px;color:#756b64;line-height:1.75}.box{padding:13px;background:#fcf8f4;border-radius:10px}code{font-size:12px}footer{font-size:12px;color:#92867e;margin:32px 0} @media(max-width:600px){main{padding:14px}header{padding:14px}h1{font-size:18px}.card{padding:13px}}
- .priority-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 2px 14px}.priority-chip{flex:0 0 auto;background:#f7f1eb;border:1px solid #dbcbbd;border-radius:12px;padding:12px 14px;cursor:grab;touch-action:pan-y;user-select:none;font-weight:600}.priority-chip.dragging{opacity:.4}.priority-chip.over{outline:2px solid #9c7456}.breakdown-table{min-width:680px}.breakdown-table td,.breakdown-table th{position:static!important;min-width:0!important;text-align:center!important}.zone-edit-table{min-width:420px}.zone-edit-table td,.zone-edit-table th{position:static!important;min-width:0!important}.zone-edit-table input[type=number]{width:70px}.text-muted{color:#94867f} </style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.1</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
+ .priority-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 2px 14px}.priority-chip{flex:0 0 auto;background:#f7f1eb;border:1px solid #dbcbbd;border-radius:12px;padding:12px 14px;cursor:grab;touch-action:pan-y;user-select:none;font-weight:600}.priority-chip.dragging{opacity:.4}.priority-chip.over{outline:2px solid #9c7456}.breakdown-table{min-width:680px}.breakdown-table td,.breakdown-table th{position:static!important;min-width:0!important;text-align:center!important}.zone-edit-table{min-width:420px}.zone-edit-table td,.zone-edit-table th{position:static!important;min-width:0!important}.zone-edit-table input[type=number]{width:70px}.text-muted{color:#94867f} </style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.2</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">補貨</button><button id="modeNew" onclick="setMode('new')">新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub">測試版在瀏覽器本機讀取與計算，不連線公司 Google Sheets。<b>上傳前請移除機密資訊、成本、售價、個資、廠商及內部備註，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數；仍須遵守公司資料使用規定。</b> 網址與公開原始碼不等於資料保密保證。</div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div><div class="row"><label>匯入 CSV <input id="upload" type="file" accept=".csv,text/csv" onchange="importCsv(event)"></label></div><div class="sub">CSV 欄位：SKU,SPU,庫存,信義,西門,ATT,文心,南西,光復,民族,板橋,大隆；另可提供 檔期、品名、顏色、尺寸。新品九店需求請填美學營運確認數；此為測試資料格式。</div></section>
 <section id="settings" class="card hide"><h2 id="settingsTitle">設定</h2><p class="sub">補貨與新品設定分開保存於目前瀏覽器，沒有同步至雲端。</p><div class="row" id="settingFields"></div><h3>配貨優先順序（最高到最低）</h3><div id="priority"></div><div class="row"><button class="primary" onclick="saveSettings()">儲存設定</button><button onclick="setStep('home')">返回</button></div></section>
@@ -1058,4 +1058,151 @@ downloadResult=function(){
  }catch(err){alert('配貨總覽 Excel 匯出停止：'+err.message)}
 };
 
+</script><script>
+/* v0.8.2: shared settings and SKU-based new-arrival caps */
+const newDefaultStores=['信義','西門','ATT','文心','南西','光復','民族','板橋'];
+let settingsSection='common', newConfirmed=false, includeDalong=false, zeroReasons={};
+const commonKey='pz-common-priority-v1', capKey='pz-new-sku-cap-v1';
+let commonPriority=saved.restock.priority.slice(),skuCap={kind:'percent',value:50};
+try{const v=JSON.parse(localStorage.getItem(commonKey)||'null');if(Array.isArray(v)&&v.length===stores.length&&stores.every(s=>v.includes(s)))commonPriority=v}catch(e){}
+try{const v=JSON.parse(localStorage.getItem(capKey)||'null');if(v&&['percent','count'].includes(v.kind)&&Number.isInteger(v.value)&&v.value>=0&&(v.kind!=='percent'||v.value<=100))skuCap=v}catch(e){}
+function saveCommonOrder(){
+ commonPriority=priorityDraft.slice();
+ saved.restock.priority=commonPriority.slice();saved.new.priority=commonPriority.slice();
+ localStorage.setItem(commonKey,JSON.stringify(commonPriority));localStorage.setItem('pz-test-settings',JSON.stringify(saved));
+ const e=document.getElementById('prioritySaveState');if(e)e.textContent='排序已儲存';
+}
+savePriority=saveCommonOrder;
+cap=function(r){
+ const stock=Math.max(0,Math.floor(Number(r.stock)||0));
+ if(mode==='restock')return Math.max(0,stock-Number(saved.restock.safe||0));
+ return skuCap.kind==='percent'?Math.floor(stock*skuCap.value/100):Math.min(stock,skuCap.value);
+};
+allocate=function(){
+ for(const r of rows){
+  if(r.blocked){r.qty=stores.map(()=>0);continue}
+  const available=cap(r);
+  r.qty=stores.map((s,i)=>mode==='new'&&s==='大隆'&&!includeDalong?0:r.demand[i]||0);
+  let used=r.qty.reduce((a,b)=>a+b,0);
+  for(const store of [...commonPriority].reverse()){
+   if(used<=available)break;
+   const i=stores.indexOf(store),cut=Math.min(r.qty[i],used-available);
+   r.qty[i]-=cut;used-=cut;
+  }
+  if(used>available)r.qty=stores.map(()=>0);
+ }
+ suggested=rows.map(r=>r.qty.slice());render();
+};
+const baseSetMode082=setMode;
+setMode=function(m){baseSetMode082(m);newConfirmed=false;includeDalong=false;zeroReasons={};renderNewEntry()};
+function renderNewEntry(){
+ document.getElementById('newEntry')?.remove();
+ const home=document.getElementById('home');
+ if(mode!=='new'){
+  home.querySelectorAll('button').forEach(b=>b.disabled=false);
+  document.getElementById('upload').disabled=false;
+  return;
+ }
+ const bar=document.createElement('div');bar.id='newEntry';bar.className='box';bar.style.margin='12px 0';
+ bar.innerHTML='<div class="row" style="gap:16px"><b>本次新品配貨門市</b><span>預設門市 8 間</span>'+
+ '<label><input type="checkbox" '+(includeDalong?'checked':'')+' onchange="includeDalong=this.checked;newConfirmed=false;renderNewEntry()"> 加入大隆</label>'+
+ '<span class="sub">本次共 '+(includeDalong?9:8)+' 間</span><button class="primary" onclick="confirmNewEntry()">確認門市</button>'+
+ '<span class="sub">'+(newConfirmed?'已確認':'請先確認再匯入資料')+'</span></div>';
+ home.insertBefore(bar,home.querySelector('.row'));
+ for(const b of home.querySelectorAll('button')){
+  if(b.closest('#newEntry'))continue;
+  if(/sample\(|sampleAllStores\(/.test(b.getAttribute('onclick')||''))b.disabled=!newConfirmed;
+ }
+ document.getElementById('upload').disabled=!newConfirmed;
+}
+function confirmNewEntry(){newConfirmed=true;renderNewEntry()}
+const originalSample082=sample;
+sample=function(){if(mode==='new'&&!newConfirmed){alert('請先確認新品配貨門市');return}originalSample082()};
+const originalAll082=sampleAllStores;
+sampleAllStores=function(){if(mode==='new'&&!newConfirmed){alert('請先確認新品配貨門市');return}originalAll082()};
+const originalImport082=importCsv;
+importCsv=function(e){if(mode==='new'&&!newConfirmed){alert('請先確認新品配貨門市');if(e?.target)e.target.value='';return}return originalImport082(e)};
+const originalChange082=changeQty;
+changeQty=function(i,j,v){if(mode==='new'&&stores[j]==='大隆'&&!includeDalong){alert('本次未選大隆');render();return}originalChange082(i,j,v)};
+const originalRender082=render;
+render=function(){
+ originalRender082();
+ if(step!=='work'||mode!=='new')return;
+ const groups=[...new Set(rows.map(r=>r.spu))];
+ document.getElementById('newControls').innerHTML='<div class="box"><h3>當次新品歸零勾選</h3>'+
+ '<div style="overflow-x:auto"><table class="zero-table" style="min-width:550px"><thead><tr><th>貨號（9碼）</th><th>原因</th><th>尺寸</th></tr></thead><tbody>'+
+ groups.map(spu=>{
+  const skuRows=rows.map((r,i)=>({r,i})).filter(x=>x.r.spu===spu);
+  const reason=zeroReasons[spu]||'';
+  return '<tr><td><label><input type="checkbox" '+(skuRows.every(x=>x.r.blocked)?'checked':'')+
+   ' onchange="updateZeroGroup(\''+encodeURIComponent(spu)+'\',this.checked)"> <b>'+esc(spu)+'</b></label></td>'+
+   '<td><select onchange="zeroReasons[decodeURIComponent(\''+encodeURIComponent(spu)+'\')]=this.value">'+
+   '<option value="">選擇原因</option>'+['尚未入庫','官網預購','分批到貨'].map(v=>'<option '+(v===reason?'selected':'')+'>'+v+'</option>').join('')+
+   '</select></td><td>'+skuRows.map(({r,i})=>'<label class="pill"><input type="checkbox" '+(r.blocked?'checked':'')+
+   ' onchange="updateZeroSku('+i+',this.checked)"> '+esc(r.size||'尺寸待庫存核對')+'</label>').join(' ')+'</td></tr>'
+ }).join('')+'</tbody></table></div></div>';
+};
+function updateZeroGroup(encoded,checked){
+ const spu=decodeURIComponent(encoded);
+ if(checked&&!zeroReasons[spu]){alert('請先選擇歸零原因');render();return}
+ rows.filter(r=>r.spu===spu).forEach(r=>r.blocked=checked);allocate();
+}
+function updateZeroSku(i,checked){
+ if(checked&&!zeroReasons[rows[i].spu]){alert('請先選擇歸零原因');render();return}
+ rows[i].blocked=checked;allocate();
+}
+const previousApprove082=approve;
+approve=function(){
+ if(mode==='new'&&!newConfirmed){alert('請先確認新品配貨門市');return}
+ previousApprove082();
+};
+function settingsTab(tab){settingsSection=tab;renderSettings()}
+function saveSafety082(){
+ const n=Number(document.getElementById('safe')?.value);
+ if(!Number.isInteger(n)||n<0){alert('安全庫存必須是非負整數');return}
+ saved.restock.safe=n;localStorage.setItem('pz-test-settings',JSON.stringify(saved));
+ document.getElementById('settingsFeedback').textContent='安全庫存已儲存';
+}
+function saveSkuCap082(){
+ const kind=document.getElementById('capKind')?.value,n=Number(document.getElementById('capNumber')?.value);
+ if(!Number.isInteger(n)||n<0||(kind==='percent'&&n>100)){alert('上限必須是有效整數，百分比範圍 0～100');return}
+ skuCap={kind,value:n};localStorage.setItem(capKey,JSON.stringify(skuCap));
+ document.getElementById('settingsFeedback').textContent='新品 SKU 上限已儲存';
+}
+function showStoreDraft082(){document.getElementById('storeDraft').hidden=false}
+function checkStoreDraft082(){
+ const name=document.getElementById('storeName')?.value.trim();
+ if(!name){alert('請填門市名稱');return}
+ if(stores.includes(name)){alert('門市已存在');return}
+ const zones=document.getElementById('storeZones')?.value.trim(),line=document.getElementById('storeLine')?.value.trim();
+ document.getElementById('storeDraftStatus').textContent=name+'：'+(!zones?'待確認倉庫／陳列；':'')+(!line?'待確認 LINE 通知及時間；':'')+'開店位置與配貨優先序也需確認。未正式加入配貨。';
+}
+renderSettings=function(){
+ document.getElementById('settingsTitle').textContent='配貨設定';
+ const info=document.querySelector('#settings > p.sub');
+ if(info)info.textContent='設定保存在目前瀏覽器。';
+ const fields=document.getElementById('settingFields'),prio=document.getElementById('priority');
+ const footer=document.querySelector('#settings .row:last-child');
+ const tabs='<div class="row" style="width:100%">'+[['common','共通'],['restock','補貨'],['new','新品']].map(([id,label])=>
+   '<button class="'+(settingsSection===id?'active':'')+'" onclick="settingsTab(\''+id+'\')">'+label+'</button>').join('')+'</div>';
+ if(settingsSection==='common'){
+  fields.innerHTML=tabs+'<div class="box" style="width:100%"><h3>門市管理</h3><p class="sub">'+stores.map(esc).join('、')+'</p>'+
+  '<button onclick="showStoreDraft082()">＋ 新增門市</button><div id="storeDraft" hidden style="margin-top:12px">'+
+  '<div class="row"><label>門市 <input id="storeName" placeholder="例如 中清"></label><label>倉庫／陳列 <input id="storeZones" placeholder="例如 1F倉庫"></label>'+
+  '<label>公版 <select id="storeTemplate"><option>美學</option><option>實業</option></select></label></div>'+
+  '<label>LINE 到貨資訊 <input id="storeLine" placeholder="到貨星期、時間及文字格式"></label> '+
+  '<button onclick="checkStoreDraft082()">檢查新增條件</button><p id="storeDraftStatus" class="sub"></p></div></div>'+
+  '<div style="width:100%"><h3>共用配貨優先順序</h3><p class="sub">補貨由左至右優先；新品不足時由右至左扣減。拖曳後儲存。</p></div>';
+  priorityDraft=commonPriority.slice();prio.innerHTML='';renderPriority();
+  footer.innerHTML='<button class="primary" onclick="saveCommonOrder()">儲存排序</button><span class="sub" id="prioritySaveState"></span><button onclick="setStep(\'home\')">返回</button>';
+ }else if(settingsSection==='restock'){
+  fields.innerHTML=tabs+'<div class="box" style="width:100%"><h3>補貨</h3><label>官網安全庫存 <input type="number" id="safe" min="0" step="1" value="'+saved.restock.safe+'"></label><p class="sub">安全庫存即配貨門檻。</p></div>';
+  prio.innerHTML='';footer.innerHTML='<button class="primary" onclick="saveSafety082()">儲存安全庫存</button><span class="sub" id="settingsFeedback"></span><button onclick="setStep(\'home\')">返回</button>';
+ }else{
+  fields.innerHTML=tabs+'<div class="box" style="width:100%"><h3>新品</h3><p class="sub">每個 SKU 獨立設定配貨上限。</p>'+
+  '<div class="row"><label>計算方式 <select id="capKind"><option value="percent" '+(skuCap.kind==='percent'?'selected':'')+'>百分比 %</option><option value="count" '+(skuCap.kind==='count'?'selected':'')+'>固定件數</option></select></label>'+
+  '<label>SKU 上限 <input type="number" min="0" step="1" id="capNumber" value="'+skuCap.value+'"></label></div></div>';
+  prio.innerHTML='';footer.innerHTML='<button class="primary" onclick="saveSkuCap082()">儲存新品上限</button><span class="sub" id="settingsFeedback"></span><button onclick="setStep(\'home\')">返回</button>';
+ }
+};
 </script></body></html>
