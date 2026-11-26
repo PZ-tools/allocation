@@ -41,7 +41,7 @@ async function inspectOriginalTemplates(event){
  if(!selected.length)return;
  const failed=[];let added=0;
  for(const file of selected){
-  if(!/\\.xlsx$/i.test(file.name)){failed.push(file.name+'（不是 xlsx）');continue}
+  if(!/\.xlsx$/i.test(file.name)){failed.push(file.name+'（不是 xlsx）');continue}
   try{
    const type=await identifyOriginalWorkbook(file);
    if(!type){failed.push(file.name+'（欄位不符合實業或美學正式範本）');continue}
