@@ -1,6 +1,6 @@
 /* PAZZO 0.8.4: guided replenishment / new import and 9-code backend lookup. */
 const guided={stage:1,batch:0,busy:false,error:'',confirmed:false,date:'',dateConfirmed:false};
-function guideNewDay(){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+(7-d.getDay())%7);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function guideNewDay(){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+((8-d.getDay())%7||7));return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 function guideIsoDay(){
  const now=new Date();now.setHours(12,0,0,0);
  const distance=(5-now.getDay()+7)%7;now.setDate(now.getDate()+distance);
