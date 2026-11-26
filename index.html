@@ -210,7 +210,7 @@ function lineSkuSize(r){return String(r.size||(/(?:^|[-_])(XS|XXL|XL|S|M|L|F)$/.
 function fmtLineCount(n){return Number.isInteger(n)?n:'待確認'}
 function formatLineArrival(date,base){
  const value=String(base||'').trim();
- const match=value.match(/^\\(([^)]+)\\)\\s*(.*)$/);
+ const match=value.match(/^\(([^)]+)\)\s*(.*)$/);
  const weekday=match?.[1]||'';
  const time=match?.[2]||'';
  const day=String(date||'').trim();
