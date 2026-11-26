@@ -30,6 +30,11 @@ function impGuessedStore(label){
  const found=stores.filter(store=>String(label||'').includes(store));
  return found.length===1?found[0]:'';
 }
+function impGuessedZone(source,store){
+ const zones=[...(restockZoneCatalog[store]||[]),...(newZonePairs[store]||[])];
+ const matched=[...new Set(zones.filter(z=>String(source||'').includes(z)))];
+ return matched.length===1?matched[0]:'';
+}
 function impCellValues(raw){
  const rows=csvParse(raw.replace(/^\uFEFF/,''));
  return rows.map(r=>r.map(v=>String(v??'').trim())).filter(r=>r.some(Boolean));
@@ -107,7 +112,7 @@ function impDemandTable(data,source){
  for(const [j,row] of records.entries()){
   const sku=String(row[skuIdx]||'').trim();if(!sku)continue;
   const item={sku,spu:impSpu(row,head,sku),size:impSize(row,head,sku),name:impField(row,head,'name'),color:impField(row,head,'color'),period:impField(row,head,'period')};
-  const entries=shopCols.length?shopCols.map(c=>({store:c.store,zone:c.zone,qty:row[c.c]})): [{store:storeIdx<0?sourceStore:String(row[storeIdx]||'').trim(),zone:zoneIdx<0?'':String(row[zoneIdx]||'').trim(),qty:row[qtyIdx]}];
+  const entries=shopCols.length?shopCols.map(c=>({store:c.store,zone:c.zone,qty:row[c.c]})): [{store:storeIdx<0?sourceStore:String(row[storeIdx]||'').trim(),zone:zoneIdx<0?impGuessedZone(source,sourceStore):String(row[zoneIdx]||'').trim(),qty:row[qtyIdx]}];
   for(const e of entries){
    if(!stores.includes(e.store))throw Error(source+'：第 '+(j+2)+' 列門市無效：'+e.store);
    if(e.qty===''||e.qty==null)continue;
@@ -188,6 +193,18 @@ function makeImportRows(){
    period:meta.period||'',name:stock.name||meta.name||'',color:stock.color||meta.color||'',size:stock.size||meta.size||'',zoneDemand};
  });
 }
+function downloadImportDemo(kind){
+ if(kind==='demand')download('PAZZO_需求測試.csv',makeCsv([
+  ['SKU','SPU','檔期','品名','尺寸',...stores],
+  ['PZ-DEMO-001-S','PZ-DEMO-001','20261130','模擬商品','S',2,3,2,1,3,1,1,1,0],
+  ['PZ-DEMO-001-M','PZ-DEMO-001','20261130','模擬商品','M',2,3,2,1,3,1,1,1,0]
+ ]));
+ else download('PAZZO_庫存測試.csv',makeCsv([
+  ['SKU','SPU','庫存','尺寸','品名'],
+  ['PZ-DEMO-001-S','PZ-DEMO-001',50,'S','模擬商品'],
+  ['PZ-DEMO-001-M','PZ-DEMO-001',50,'M','模擬商品']
+ ]));
+}
 function downloadImportSkus(){
  const t=impTotals();
  if(!t.demand.length){alert('請先匯入需求');return}
@@ -242,6 +259,7 @@ function newImportPanel(){
  '<div class="row"><b>庫存</b><input type="file" accept=".xlsx,.csv" multiple onchange="importFiles(\'stock\',this.files);this.value=\'\'"></div><div id="importStockList"></div>'+
  '<div class="row"><button type="button" onclick="downloadImportSkus()">下載待查庫存貨號</button>'+
  '<button type="button" id="importProceed" class="primary" onclick="startFromFiles()" disabled>開始配貨</button></div>'+
+ '<div class="row"><button type="button" onclick="downloadImportDemo(\'demand\')">需求測試範本</button><button type="button" onclick="downloadImportDemo(\'stock\')">庫存測試範本</button></div>'+ 
  '<div id="importStatus" class="sub"></div></div>';
  home.insertBefore(wrapper,btnBar);
  renderImportState();
