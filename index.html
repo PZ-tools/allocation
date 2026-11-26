@@ -2206,7 +2206,8 @@ guideMount();
 /* v0.8.9 new arrival workbook: grouped horizontal store headers and SKU-level editing.
    Restock preview/render/approval deliberately continue to use the previous path. */
 function newQtyTotal(row){return row.qty.reduce((sum,x)=>sum+Number(x||0),0)}
-function newDemandTotal(row){return row.demand.reduce((sum,x,i)=>sum+(stores[i]==='大隆'&&!includeDalong?0:Number(x||0)),0)}
+function newVisibleDemand(row,storeIndex){return row.blocked?0:Number(row.demand[storeIndex]||0)}
+function newDemandTotal(row){return row.demand.reduce((sum,x,i)=>sum+(stores[i]==='大隆'&&!includeDalong?0:newVisibleDemand(row,i)),0)}
 function newStoreParts(store){return newZonePairs[store]?.length>1?['需求','實際','倉庫','陳列']:['需求','實際']}
 function newZoneState(row,store){
  const q=Number(row.qty[stores.indexOf(store)]||0),names=newZonePairs[store]||[];
@@ -2275,6 +2276,7 @@ function newWorkbenchRender(){
  document.getElementById('workTitle').textContent='新品｜逐筆配貨確認';
  const groups=new Map();
  rows.forEach((row,index)=>{if(!groups.has(row.spu))groups.set(row.spu,[]);groups.get(row.spu).push({row,index})});
+ const sortedGroups=[...groups.entries()].sort(([a],[b])=>newCompareNineCode(a,b));
  const activeStores=stores.filter(store=>store!=='大隆'||includeDalong);
  const actions=document.getElementById('workActions');
  if(actions)actions.innerHTML='<button class="primary" onclick="approve()">套用</button>'+
@@ -2328,7 +2330,7 @@ function newWorkbenchRender(){
  const numbers=newMetaCollapsed?[sumAllocated,sumRemaining]:[sumStock,orderedTotal,sumAllocated,sumRemaining];
  for(const store of activeStores){
   const si=stores.indexOf(store);
-  numbers.push(rows.reduce((sum,r)=>sum+Number(r.demand[si]||0),0));
+  numbers.push(rows.reduce((sum,r)=>sum+newVisibleDemand(r,si),0));
   numbers.push(rows.reduce((sum,r)=>sum+Number(r.qty[si]||0),0));
   if(newZonePairs[store].length>1){
    for(const zone of newZonePairs[store])
@@ -2339,7 +2341,7 @@ function newWorkbenchRender(){
  if(!newMetaCollapsed)totalLabels.push('<td></td>','<td></td>');
  const totalRow=totalLabels.join('')+numbers.map((n,i)=>'<td class="'+(i<(newMetaCollapsed?2:4)?'':'new-store-total')+'">'+n+'</td>').join('');
  const body=['<tr class="new-total-row">'+totalRow+'</tr>'];
- for(const [code,items] of groups){
+ for(const [code,items] of sortedGroups){
   const total=items.reduce((sum,{row})=>sum+newDemandTotal(row),0);
   const groupBlocked=items.some(({row})=>row.blocked);
   for(let k=0;k<items.length;k++){
@@ -2357,7 +2359,7 @@ function newWorkbenchRender(){
    cells+='<td class="number-cell">'+allocated+'</td>'+
     '<td class="number-cell stock-cell '+(remaining<0?'grid-invalid':'')+'">'+remaining+'</td>';
    for(const store of activeStores){
-    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+'"',qty=Number(row.qty[si]||0),needs=Number(row.demand[si]||0);
+    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+'"',qty=Number(row.qty[si]||0),needs=newVisibleDemand(row,si);
     cells+='<td class="store-cell" '+bg+'>'+needs+'</td><td class="store-cell" '+bg+'>'+input(qty,index,store,'')+'</td>';
     if(newZonePairs[store].length>1){
      const z=newZoneState(row,store);
