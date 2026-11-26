@@ -16,7 +16,7 @@
 #work.new-workbench .tablebox .group-total{font-weight:700;background:#f6f1eb}
 #work.new-workbench .tablebox .grid-invalid{background:#ffe6e1!important}
 #work.new-workbench .tablebox .grid-warning{background:#fff2d8!important}
-</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.9</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
+</style></head><body><header><div><h1>配貨小幫手GOGOGO</h1><small>本機計算・操作測試版 v0.8.10</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">① 補貨</button><button id="modeNew" onclick="setMode('new')">② 新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub"><b>上傳請移除機密資訊，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數</b></div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div></section>
 <section id="settings" class="card hide"><h2 id="settingsTitle">設定</h2><p class="sub">補貨與新品設定分開保存於目前瀏覽器，沒有同步至雲端。</p><div class="row" id="settingFields"></div><h3>配貨優先順序（最高到最低）</h3><div id="priority"></div><div class="row"><button class="primary" onclick="saveSettings()">儲存設定</button><button onclick="setStep('home')">返回</button></div></section>
@@ -849,8 +849,9 @@ function displayDateAndTime(timeText){
 renderLineNotices=function(){
  const host=document.getElementById('lineAll');if(!host)return;
  const batch=mode==='new'?'sun':document.getElementById('lineBatch').value;
- const period=rows.map(r=>String(r.period||'')).find(Boolean)||'';
- const isoPeriod=parsePeriodISO(period),label=isoPeriod?isoPeriod.slice(5,7)+isoPeriod.slice(8):'（檔期待確認）';
+ // 補貨：當次打單日期；新品：本次檔期日期，皆輸出 MMDD 四碼。
+ const dateISO=mode==='restock'?localToday():currentPeriodISO();
+ const label=dateISO.slice(5,7)+dateISO.slice(8,10);
  const sections=[];
  for(const store of stores){
   const defs=lineDefs[store],config=defs[batch]||null;
@@ -866,7 +867,7 @@ renderLineNotices=function(){
   }
   // No display line unless source explicitly had a display section or new-product display is required.
   const lines=[...info].filter(([z,n])=>n>0 || (unresolved&&allZonesForStore(store).includes(z)))
-    .map(([z,n])=>'PA'+(store==='ATT'?' ATT':store)+'店_'+z+'_'+(mode==='new'?label+'新品':'補貨')+'(共'+(unresolved?'待確認':n)+'件)');
+    .map(([z,n])=>'PA'+(store==='ATT'?' ATT':store)+'店_'+z+'_'+(label+(mode==='new'?'新品':'補貨'))+'(共'+(unresolved?'待確認':n)+'件)');
   if(!lines.length)continue;
   sections.push(lines.join('\n')+'\n\n'+displayDateAndTime(time));
  }
