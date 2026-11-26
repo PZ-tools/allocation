@@ -453,6 +453,54 @@ function verifyExportedWorkbook(blob,expectedRows,expectedQty,expectedSkus){
   return found;
  });
 }
+
+function xlsxFixExportColumnWidths(doc,type){
+ const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+ const root=doc.documentElement;
+ const sheetFormat=doc.getElementsByTagNameNS(ns,'sheetFormatPr')[0];
+ const defaultWidth=sheetFormat?.getAttribute('defaultColWidth')||'8.43';
+ let cols=doc.getElementsByTagNameNS(ns,'cols')[0];
+ if(!cols){
+  cols=doc.createElementNS(ns,'cols');
+  const data=doc.getElementsByTagNameNS(ns,'sheetData')[0];
+  if(!data)throw Error('Excel 缺少工作表資料');
+  root.insertBefore(cols,data);
+ }
+ const colNodes=()=>Array.from(cols.getElementsByTagNameNS(ns,'col'));
+ const effectiveWidth=n=>{
+  const node=colNodes().find(c=>Number(c.getAttribute('min'))<=n&&Number(c.getAttribute('max'))>=n);
+  return node?.getAttribute('width')||defaultWidth;
+ };
+ const reference=type==='信義'?12:3,targets=type==='信義'?[8,9,10,11]:[1,2];
+ const width=effectiveWidth(reference);
+ if(!Number.isFinite(Number(width))||Number(width)<=0)throw Error('原始公版基準欄寬無效');
+ for(const n of targets){
+  let node=colNodes().find(c=>Number(c.getAttribute('min'))<=n&&Number(c.getAttribute('max'))>=n);
+  if(node){
+   const first=Number(node.getAttribute('min')),last=Number(node.getAttribute('max'));
+   if(first<n){
+    const before=node.cloneNode(true);before.setAttribute('min',String(first));before.setAttribute('max',String(n-1));
+    cols.insertBefore(before,node);
+   }
+   if(n<last){
+    const after=node.cloneNode(true);after.setAttribute('min',String(n+1));after.setAttribute('max',String(last));
+    cols.insertBefore(after,node.nextSibling);
+   }
+  }else{
+   node=doc.createElementNS(ns,'col');cols.appendChild(node);
+  }
+  node.setAttribute('min',String(n));node.setAttribute('max',String(n));
+  node.setAttribute('width',width);node.setAttribute('customWidth','1');
+  node.removeAttribute('bestFit');
+ }
+ // Ensure ascending non-overlapping column definitions, preserving other columns.
+ const sorted=colNodes().sort((a,b)=>Number(a.getAttribute('min'))-Number(b.getAttribute('min')));
+ for(const col of sorted)cols.appendChild(col);
+ for(let i=1;i<sorted.length;i++)if(Number(sorted[i-1].getAttribute('max'))>=Number(sorted[i].getAttribute('min')))
+  throw Error('Excel 欄寬調整造成重疊定義，已中止匯出');
+ if(targets.some(n=>effectiveWidth(n)!==width))throw Error('打單 Excel 欄寬驗證未通過');
+}
+
 async function outputFromOriginal(file,records,type){
  const bytes=new Uint8Array(await file.arrayBuffer()),entries=zipRead(bytes);
  const target=entries.find(x=>x.name==='xl/worksheets/sheet1.xml');
@@ -495,6 +543,7 @@ async function outputFromOriginal(file,records,type){
  });
  const dim=doc.getElementsByTagNameNS(ns,'dimension')[0];
  if(dim)dim.setAttribute('ref',(type==='信義'?'A1:P':'A1:D')+(records.length+1));
+ xlsxFixExportColumnWidths(doc,type);
  const out=enc.encode(new XMLSerializer().serializeToString(doc));
  target.data=out;target.method=0;target.usize=out.length;target.csize=out.length;target.crc=crc(out);
  return zipRepack(entries);
@@ -792,6 +841,7 @@ renderLineNotices=function(){
   const defs=lineDefs[store],config=defs[batch]||null;
   const time=config?.time || '('+({wed:'三',thu:'四'}[batch]||'日')+')（時間待確認）';
   const data=summarizeZone(store),info=new Map(),i=stores.indexOf(store);
+  if(data.total<=0)continue;
   let unresolved=false;
   for(const r of rows)if(r.qty[i]){
    const res=zoneForSKU(r,store);
@@ -802,11 +852,7 @@ renderLineNotices=function(){
   // No display line unless source explicitly had a display section or new-product display is required.
   const lines=[...info].filter(([z,n])=>n>0 || (unresolved&&allZonesForStore(store).includes(z)))
     .map(([z,n])=>'PA'+(store==='ATT'?' ATT':store)+'店_'+z+'_'+(mode==='new'?label+'新品':'補貨')+'(共'+(unresolved?'待確認':n)+'件)');
-  if(!lines.length&&data.total===0){
-    // The user requested the whole supplied store-format notice. A zero-quantity branch is still explicit.
-    const fallback=mode==='new'?newZonePairs[store]:[defaultWarehouse[store]];
-    for(const z of fallback.slice(0,1))lines.push('PA'+(store==='ATT'?' ATT':store)+'店_'+z+'_'+(mode==='new'?label+'新品':'補貨')+'(共0件)');
-  }
+  if(!lines.length)continue;
   sections.push(lines.join('\n')+'\n\n'+displayDateAndTime(time));
  }
  host.value=sections.join('\n-\n');
