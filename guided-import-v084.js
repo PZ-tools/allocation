@@ -95,6 +95,68 @@ async function guideReadSheet(file,index){
  }
  return file.kind==='demand'?impDemandTable(data,file.name+' / '+tab.name):impStockTable(data,file.name+' / '+tab.name);
 }
+
+function guideNewStore(value){
+ const x=String(value??'').replace(/[\s　_-]/g,'').replace(/PAZZO|實體|門市|百貨|店|館|專櫃/g,'').toUpperCase();
+ return stores.find(y=>x===y.toUpperCase())||'';
+}
+function guideNewDemandTable(data,source){
+ // Only the explicitly approved operation-confirmed quantity group can drive new allocations.
+ const markers=[];
+ for(let r=0;r<Math.min(data.length,90);r++)for(let c=0;c<(data[r]||[]).length;c++){
+  const cell=String(data[r]?.[c]??'').replace(/[\s　]/g,'');
+  if(/(?:【2】|\[2\]|^2[.、])實體門市.*叫貨.*營運確認數/.test(cell))markers.push({r,c});
+ }
+ if(markers.length!==1)throw Error(source+ (markers.length===0?'：找不到「【2】實體門市 叫貨 營運確認數」欄位，已阻止誤抓其他數量':'：找到多個「【2】」數量區塊，需核對來源'));
+ const group=markers[0];
+ let storeHeader=null;
+ for(let r=group.r;r<=Math.min(group.r+10,data.length-1);r++){
+  const cols=[],seen=new Set();
+  for(let c=group.c;c<(data[r]||[]).length;c++){
+   const store=guideNewStore(data[r][c]);if(!store)continue;
+   if(seen.has(store))throw Error(source+'：「【2】」區塊有重複門市 '+store);
+   seen.add(store);cols.push({store,c});
+  }
+  if(cols.length>(storeHeader?.cols.length||0))storeHeader={r,cols};
+ }
+ if(!storeHeader||!storeHeader.cols.length)throw Error(source+'：「【2】」下找不到門市欄位，已阻止讀取其他數量');
+ let barcodeCol=-1,nineCol=-1,sizeCol=-1,nameCol=-1,colorCol=-1;
+ for(let r=0;r<=Math.min(storeHeader.r+2,data.length-1);r++){
+  for(let c=0;c<(data[r]||[]).length;c++){
+   const label=String(data[r]?.[c]??'').replace(/[\s　*（）()]/g,'');
+   if(/^(條碼|13碼貨號|貨號13碼|商品條碼|SKU|品號)$/.test(label))barcodeCol=c;
+   else if(/^(貨號|9碼貨號|九碼貨號|SPU)$/.test(label))nineCol=c;
+   else if(/^(尺寸|尺碼|規格)$/.test(label))sizeCol=c;
+   else if(/^(品名|商品名稱)$/.test(label))nameCol=c;
+   else if(/^(顏色|色號)$/.test(label))colorCol=c;
+  }
+ }
+ if(barcodeCol<0&&nineCol<0)throw Error(source+'：找不到商品貨號／條碼欄位，不能確認 SKU');
+ const entries=[],seen=new Set();
+ for(let r=storeHeader.r+1;r<data.length;r++){
+  const row=data[r]||[];
+  const barcode=barcodeCol<0?'':String(row[barcodeCol]??'').trim().toUpperCase();
+  const explicit=nineCol<0?'':guideCode(row[nineCol]);
+  const nine=explicit||(/^[A-Z0-9]{13}$/.test(barcode)?barcode.slice(0,9):'');
+  if(!nine)continue;
+  const sku=/^[A-Z0-9]{13}$/.test(barcode)?barcode:(barcode||nine);
+  for(const item of storeHeader.cols){
+   const raw=String(row[item.c]??'').trim();if(!raw)continue;
+   if(!/^\d+$/.test(raw))throw Error(source+'：第 '+(r+1)+' 列 '+item.store+' 營運確認數不是非負整數');
+   const qty=Number(raw);if(!qty)continue;
+   const key=sku+'|'+item.store;if(seen.has(key))throw Error(source+'：同 SKU 重複確認數 '+key);
+   seen.add(key);
+   entries.push({sku,spu:nine,lookup9:nine,store:item.store,zone:'',
+     size:sizeCol<0?'':String(row[sizeCol]??'').trim(),
+     name:nameCol<0?'':String(row[nameCol]??'').trim(),
+     color:colorCol<0?'':String(row[colorCol]??'').trim(),
+     period:guided.date.replace(/-/g,''),qty,source});
+  }
+ }
+ if(!entries.length)throw Error(source+'：「【2】」沒有有效門市營運確認數');
+ return entries;
+}
+
 function guideHeader(data,kind,source){
  const found=data.findIndex((row,i)=>i<35&&row.some(v=>/^(條碼|SKU|品號|貨號|\*貨號\(13碼\))$/i.test(String(v||'').trim()))&&
  (kind==='stock'?row.some(v=>/^(庫存|現貨庫存|可用庫存|庫存數量|現貨數量|可配庫存)$/i.test(String(v||'').trim())):
@@ -104,6 +166,7 @@ function guideHeader(data,kind,source){
 }
 function guideIndex(head,pattern){return head.findIndex(v=>pattern.test(String(v??'').replace(/[\s　]/g,'')))}
 impDemandTable=function(data,source){
+ if(mode==='new')return guideNewDemandTable(data,source);
  const {head,records}=guideHeader(data,'demand',source);
  const barcodeIdx=guideIndex(head,/^(條碼|SKU|品號)$/i),nineIdx=guideIndex(head,/^(貨號|9碼貨號|九碼貨號|SPU)$/i);
  const skuIdx=barcodeIdx>=0?barcodeIdx:nineIdx;
