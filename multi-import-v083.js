@@ -141,25 +141,36 @@ async function importFiles(kind,fileList){
   if(container.some(x=>x.name===file.name&&x.size===file.size&&x.modified===file.lastModified)){errors.push(file.name+'：已匯入相同檔案');continue}
   try{
    const sheets=await impRead(file);
-   const extracted=[];
+   const parsedSheets=[],sheetProblems=[];
    for(const sheet of sheets){
     const source=file.name+' / '+sheet.name;
-    try{extracted.push(...(kind==='demand'?impDemandTable(sheet.rows,source):impStockTable(sheet.rows,source)))}catch(err){
-     // Additional blank or unrelated worksheets do not block a valid worksheet in the same XLSX.
-     if(sheets.length===1)throw err;
-     errors.push(err.message);
-    }
+    try{
+     const entries=kind==='demand'?impDemandTable(sheet.rows,source):impStockTable(sheet.rows,source);
+     parsedSheets.push({name:sheet.name,entries});
+    }catch(err){sheetProblems.push(err.message)}
    }
-   if(!extracted.length)throw Error('沒有可辨識的'+(kind==='demand'?'需求':'庫存')+'資料');
-   container.push({name:file.name,size:file.size,modified:file.lastModified,entries:extracted});
+   if(!parsedSheets.length)throw Error(sheetProblems.join('；')||'沒有可辨識的資料');
+   // 多工作表先由使用者挑選，不能把不同到貨日期默默加總。
+   const selected=parsedSheets.length===1?'0':'';
+   container.push({name:file.name,size:file.size,modified:file.lastModified,sheets:parsedSheets,
+    selected,entries:selected==='0'?parsedSheets[0].entries:[]});
   }catch(err){errors.push(file.name+'：'+err.message)}
  }
  importState.errors=errors;importState.ready=false;renderImportState();
+}
+function selectImportedSheet(kind,index,value){
+ const f=importState[kind][index];if(!f)return;
+ f.selected=value;
+ f.entries=value===''?[]:value==='all'?f.sheets.flatMap(s=>s.entries):(f.sheets[Number(value)]?.entries||[]);
+ importState.ready=false;renderImportState();
 }
 function removeImported(kind,index){importState[kind].splice(index,1);importState.ready=false;renderImportState()}
 function impTotals(){
  const demand=importState.demand.flatMap(f=>f.entries),stock=importState.stock.flatMap(f=>f.entries);
  const warnings=[],demandKeys=new Set(),stockKeys=new Set(),skuSet=new Set(),meta=new Map();
+ for(const kind of ['demand','stock'])for(const f of importState[kind]){
+  if(f.sheets?.length>1&&f.selected==='')warnings.push('尚未選擇工作表：'+f.name);
+ }
  const demands=new Map(),stocks=new Map();
  for(const r of demand){
   const key=[r.sku,r.store,r.zone].join('|');
@@ -227,7 +238,12 @@ function renderImportState(){
  for(const kind of ['demand','stock']){
   const label=kind==='demand'?'需求':'庫存',files=importState[kind];
   const cell=document.getElementById('import'+(kind==='demand'?'Demand':'Stock')+'List');
-  if(cell)cell.innerHTML=files.map((f,i)=>'<div class="row" style="margin:3px 0;gap:8px"><span class="pill">'+esc(f.name)+'｜'+f.entries.length+' 筆</span><button type="button" onclick="removeImported(\''+kind+'\','+i+')" style="padding:4px 8px">移除</button></div>').join('');
+  if(cell)cell.innerHTML=files.map((f,i)=>'<div class="row" style="margin:3px 0;gap:8px"><span class="pill">'+esc(f.name)+'｜'+f.entries.length+' 筆</span>'+
+  (f.sheets?.length>1?'<label>工作表 <select onchange="selectImportedSheet(\''+kind+'\','+i+',this.value)"><option value="">請選擇</option>'+
+   f.sheets.map((sheet,j)=>'<option value="'+j+'" '+(f.selected===String(j)?'selected':'')+'>'+esc(sheet.name)+'</option>').join('')+
+   (kind==='stock'?'<option value="all" '+(f.selected==='all'?'selected':'')+'>全部工作表</option>':'')+
+   '</select></label>':'')+
+  '<button type="button" onclick="removeImported(\''+kind+'\','+i+')" style="padding:4px 8px">移除</button></div>').join('');
   parts.push(label+' '+files.length+' 檔');
  }
  parts.push('需求 '+t.demand.length+' 筆','庫存 '+t.stock.length+' 筆','貨號 '+t.skuSet.size+' 個');
