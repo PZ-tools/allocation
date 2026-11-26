@@ -122,7 +122,7 @@ renderSettings=function(){
  const info=document.querySelector('#settings > p.sub');
  if(info)info.textContent='設定保存在目前瀏覽器。';
  const fields=document.getElementById('settingFields'),prio=document.getElementById('priority');
- const footer=document.querySelector('#settings .row:last-child');
+ const footer=document.querySelector('#settings > .row:last-child');
  const tabs='<div class="row" style="width:100%">'+[['common','共通'],['restock','補貨'],['new','新品']].map(([id,label])=>
    '<button class="'+(settingsSection===id?'active':'')+'" onclick="settingsTab(\''+id+'\')">'+label+'</button>').join('')+'</div>';
  if(settingsSection==='common'){
