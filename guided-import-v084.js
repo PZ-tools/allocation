@@ -101,62 +101,74 @@ function guideNewStore(value){
  return stores.find(y=>x===y.toUpperCase())||'';
 }
 function guideNewDemandTable(data,source){
- // Only the explicitly approved operation-confirmed quantity group can drive new allocations.
+ // Use only the 【2】 operational-confirmation block. Never include 【1】 or 【3】.
  const markers=[];
- for(let r=0;r<Math.min(data.length,90);r++)for(let c=0;c<(data[r]||[]).length;c++){
-  const cell=String(data[r]?.[c]??'').replace(/[\s　]/g,'');
-  if(/(?:【2】|\[2\]|^2[.、])實體門市.*叫貨.*營運確認數/.test(cell))markers.push({r,c});
+ for(let r=0;r<Math.min(data.length,80);r++)for(let c=0;c<(data[r]||[]).length;c++){
+  const normalized=String(data[r]?.[c]??'').replace(/[\s　]/g,'');
+  if(/(?:【2】|\[2\]|^2[.、])實體門市.*叫貨.*營運確認數/.test(normalized))markers.push({r,c});
  }
- if(markers.length!==1)throw Error(source+ (markers.length===0?'：找不到「【2】實體門市 叫貨 營運確認數」欄位，已阻止誤抓其他數量':'：找到多個「【2】」數量區塊，需核對來源'));
- const group=markers[0];
- let storeHeader=null;
- for(let r=group.r;r<=Math.min(group.r+10,data.length-1);r++){
-  const cols=[],seen=new Set();
-  for(let c=group.c;c<(data[r]||[]).length;c++){
-   const store=guideNewStore(data[r][c]);if(!store)continue;
-   if(seen.has(store))throw Error(source+'：「【2】」區塊有重複門市 '+store);
-   seen.add(store);cols.push({store,c});
+ if(markers.length!==1)throw Error(source+(markers.length?'：【2】營運確認數區塊重複，停止辨識':'：缺少「【2】實體門市 叫貨 營運確認數」，停止辨識'));
+ const marker=markers[0],top=data[marker.r]||[];
+ let endCol=top.length;
+ for(let c=marker.c+1;c<top.length;c++){
+  const value=String(top[c]??'').replace(/[\s　]/g,'');
+  if(/^【[134]】|^\[[134]\]/.test(value)){endCol=c;break}
+ }
+ let header=null;
+ for(let r=marker.r+1;r<=Math.min(marker.r+5,data.length-1);r++){
+  const cols=[],used=new Set();
+  for(let c=marker.c;c<endCol;c++){
+   const value=String(data[r]?.[c]??'').trim();
+   if(value==='合計'||value==='總計')break;
+   const store=guideNewStore(value);
+   if(!store)continue; // e.g. 中清 is not yet active
+   if(used.has(store))throw Error(source+'：【2】區塊重複門市 '+store);
+   used.add(store);cols.push({store,c});
   }
-  if(cols.length>(storeHeader?.cols.length||0))storeHeader={r,cols};
+  if(!header||cols.length>header.cols.length)header={r,cols};
  }
- if(!storeHeader||!storeHeader.cols.length)throw Error(source+'：「【2】」下找不到門市欄位，已阻止讀取其他數量');
- let barcodeCol=-1,nineCol=-1,sizeCol=-1,nameCol=-1,colorCol=-1;
- for(let r=0;r<=Math.min(storeHeader.r+2,data.length-1);r++){
-  for(let c=0;c<(data[r]||[]).length;c++){
-   const label=String(data[r]?.[c]??'').replace(/[\s　*（）()]/g,'');
-   if(/^(條碼|13碼貨號|貨號13碼|商品條碼|SKU|品號)$/.test(label))barcodeCol=c;
-   else if(/^(貨號|9碼貨號|九碼貨號|SPU)$/.test(label))nineCol=c;
-   else if(/^(尺寸|尺碼|規格)$/.test(label))sizeCol=c;
-   else if(/^(品名|商品名稱)$/.test(label))nameCol=c;
-   else if(/^(顏色|色號)$/.test(label))colorCol=c;
+ if(!header||header.cols.length!==stores.length||
+    header.cols.some((x,i)=>x.store!==stores[i]))
+  throw Error(source+'：【2】無法完整核對九間門市欄位，停止辨識');
+ // Product identity and attributes are in the left-side header, before 【2】.
+ const headers=[];
+ for(let r=0;r<=Math.min(header.r+2,data.length-1);r++){
+  for(let c=0;c<marker.c;c++){
+   const txt=String(data[r]?.[c]??'').replace(/[\s　*（）()]/g,'');
+   headers.push({r,c,txt});
   }
  }
- if(barcodeCol<0&&nineCol<0)throw Error(source+'：找不到商品貨號／條碼欄位，不能確認 SKU');
- const entries=[],seen=new Set();
- for(let r=storeHeader.r+1;r<data.length;r++){
-  const row=data[r]||[];
-  const barcode=barcodeCol<0?'':String(row[barcodeCol]??'').trim().toUpperCase();
+ const column=(pattern)=>headers.find(x=>pattern.test(x.txt))?.c??-1;
+ const barcodeCol=column(/^(條碼|13碼貨號|貨號13碼|商品條碼|SKU|品號)$/);
+ const nineCol=column(/^(貨號|9碼貨號|九碼貨號|SPU)$/);
+ const periodCol=column(/^檔期$/),nameCol=column(/^(品名|商品名稱)$/);
+ const colorCol=column(/^顏色$/),sizeCol=column(/^(尺寸|尺碼|規格)$/);
+ if(barcodeCol<0)throw Error(source+'：無法確認完整13碼品號欄位，停止辨識');
+ const entries=[],seen=new Set(),targetPeriod=guided.date.replace(/-/g,'');
+ for(let r=header.r+1;r<data.length;r++){
+  const row=data[r]||[],barcode=String(row[barcodeCol]??'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{13}$/.test(barcode))continue; // skip top summary and footnotes
+  const period=periodCol<0?'':String(row[periodCol]??'').trim();
+  if(period&&/^\d{8}$/.test(period)&&period!==targetPeriod)
+   throw Error(source+'：第 '+(r+1)+' 列商品檔期與本次日期不同');
   const explicit=nineCol<0?'':guideCode(row[nineCol]);
-  const nine=explicit||(/^[A-Z0-9]{13}$/.test(barcode)?barcode.slice(0,9):'');
-  if(!nine)continue;
-  const sku=/^[A-Z0-9]{13}$/.test(barcode)?barcode:(barcode||nine);
-  for(const item of storeHeader.cols){
-   const raw=String(row[item.c]??'').trim();if(!raw)continue;
-   if(!/^\d+$/.test(raw))throw Error(source+'：第 '+(r+1)+' 列 '+item.store+' 營運確認數不是非負整數');
+  const nine=explicit||barcode.slice(0,9);
+  const base={sku:barcode,spu:nine,lookup9:nine,zone:'',
+   size:sizeCol<0?'':String(row[sizeCol]??'').trim(),
+   name:nameCol<0?'':String(row[nameCol]??'').trim(),
+   color:colorCol<0?'':String(row[colorCol]??'').trim(),
+   period:targetPeriod,source};
+  for(const {store,c} of header.cols){
+   const raw=String(row[c]??'').trim();if(!raw)continue;
+   if(!/^\d+$/.test(raw))throw Error(source+'：第 '+(r+1)+' 列 '+store+' 營運確認數無效');
    const qty=Number(raw);if(!qty)continue;
-   const key=sku+'|'+item.store;if(seen.has(key))throw Error(source+'：同 SKU 重複確認數 '+key);
-   seen.add(key);
-   entries.push({sku,spu:nine,lookup9:nine,store:item.store,zone:'',
-     size:sizeCol<0?'':String(row[sizeCol]??'').trim(),
-     name:nameCol<0?'':String(row[nameCol]??'').trim(),
-     color:colorCol<0?'':String(row[colorCol]??'').trim(),
-     period:guided.date.replace(/-/g,''),qty,source});
+   const key=barcode+'|'+store;if(seen.has(key))throw Error(source+'：【2】重複需求 '+key);
+   seen.add(key);entries.push({...base,store,qty});
   }
  }
- if(!entries.length)throw Error(source+'：「【2】」沒有有效門市營運確認數');
+ if(!entries.length)throw Error(source+'：【2】區塊沒有有效門市需求');
  return entries;
 }
-
 function guideHeader(data,kind,source){
  const found=data.findIndex((row,i)=>i<35&&row.some(v=>/^(條碼|SKU|品號|貨號|\*貨號\(13碼\))$/i.test(String(v||'').trim()))&&
  (kind==='stock'?row.some(v=>/^(庫存|現貨庫存|可用庫存|庫存數量|現貨數量|可配庫存)$/i.test(String(v||'').trim())):
@@ -278,6 +290,7 @@ function guideNext(target){
  if(target===3&&mode==='new'&&!newConfirmed){guideAlert('請先確認本次新品配貨門市');return}
  if(target===4){
   const t=impTotals();if(!t.demand.length||!t.stock.length||t.warnings.length||importState.errors.length){guideAlert('請先完成需求與庫存比對');return}
+  startFromFiles();return;
  }
  guided.stage=target;guided.batch=0;guideRender();
  document.getElementById('guidedArea')?.scrollIntoView({behavior:'smooth',block:'start'});
@@ -298,7 +311,7 @@ function guideRender(){
  const root=document.getElementById('guidedArea');if(!root)return;
  const demand=importState.demand.flatMap(f=>f.entries),stock=importState.stock.flatMap(f=>f.entries);
  const codes=guideList(),count=Math.ceil(codes.length/100),errors=guideDemandIssues(), t=impTotals();
- const stage=guided.stage,labels=['需求','貨號','庫存','配貨'];
+ const stage=guided.stage,labels=['需求','貨號','庫存'];
  let content='';
  if(stage===1)content='<h3>01｜匯入門市需求</h3>'+ ('<div class="guide-date"><label>本次'+(mode==='new'?'新品檔期':'補貨')+'日期 <input type="date" value="'+guided.date+'" onchange="guideSetDate(this.value)"></label> <button class="'+(guided.dateConfirmed?'':'primary')+'" onclick="guideConfirmDate()">'+(guided.dateConfirmed?'✓ 日期已確認':'確認日期')+'</button></div><p class="sub">以 '+guideMMDD()+' 比對工作表，仍可手動切換。</p>')+
  '<label class="guide-upload">選擇需求檔案 <input aria-label="選擇需求檔案" type="file" multiple accept=".xlsx,.csv" '+(!guided.dateConfirmed?'disabled':'')+' onchange="importFiles(\'demand\',this.files);this.value=\'\'"></label>'+
@@ -321,10 +334,8 @@ function guideRender(){
  guideFileMarkup('stock')+
  '<p class="sub">需求 '+t.demand.length+' 筆｜庫存 '+stock.length+' 筆｜待對應 '+t.warnings.filter(x=>x.startsWith('缺少庫存')).length+' 筆</p>'+
  (t.warnings.length?'<p class="warn">'+esc(t.warnings.slice(0,5).join('；'))+'</p>':'')+
- '<div class="guide-nav"><button onclick="guideBack()">← 返回貨號</button><button class="primary" onclick="guideNext(4)" '+(!stock.length||t.warnings.length?'disabled':'')+'>核對庫存 →</button></div>';
- if(stage===4)content='<h3>04｜確認並開始配貨</h3><p>需求 '+t.demand.length+' 筆、庫存 '+stock.length+' 筆</p>'+
- (t.warnings.length?'<p class="warn">'+esc(t.warnings.slice(0,5).join('；'))+'</p>':'<p class="sub">已完成貨號及庫存比對，可進入配貨預覽。</p>')+
- '<div class="guide-nav"><button onclick="guideBack()">← 返回庫存</button><button class="primary" onclick="startFromFiles()" '+(t.warnings.length?'disabled':'')+'>開始配貨 →</button></div>';
+ '<div class="guide-nav"><button onclick="guideBack()">← 返回貨號</button><button class="primary" onclick="guideNext(4)" '+(!stock.length||t.warnings.length||importState.errors.length?'disabled':'')+'>開始配貨 →</button></div>';
+
  root.innerHTML='<div class="guide-steps">'+labels.map((l,i)=>'<div class="'+(i+1===stage?'is-active':i+1<stage?'is-done':'')+'">'+(i+1)+' '+l+'</div>').join('')+'</div>'+
  content+'<div id="guideNotice" class="sub">'+esc(guided.error||'')+'</div>';
 }
