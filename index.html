@@ -1743,17 +1743,25 @@ function guideTabScore(tab,index,kind){
  const name=String(tab.name||'').trim(),compact=name.replace(/[\s　]/g,'');
  let score=0;
  if(kind==='demand'){
-  if(/補貨|叫貨|營運確認|需求/.test(compact))score+=200000;
+  if(/補貨|叫貨|營運確認|需求/.test(compact))score+=120000;
   if(/PZ|PAZZO/i.test(compact))score+=100000;
   if(/測試|範例|制服|公告|說明|封面|設定|目錄|庫存|資料彙整/i.test(compact))score-=350000;
-  const date=/(?:^|[^\d])(\d{2})(\d{2})(?!\d)/g;let match,latest=0;
-  while((match=date.exec(compact))!==null){
-   const month=Number(match[1]),day=Number(match[2]);
-   if(month>=1&&month<=12&&day>=1&&day<=31)latest=Math.max(latest,month*100+day);
+  const regexp=/(?:^|[^\d])(\d{2})(\d{2})(?!\d)/g;
+  const today=new Date(),base=new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime();
+  let match,best=Infinity;
+  while((match=regexp.exec(compact))!==null){
+   const month=Number(match[1]),day=Number(match[2]);if(month<1||month>12||day<1||day>31)continue;
+   for(const year of [today.getFullYear()-1,today.getFullYear(),today.getFullYear()+1]){
+    const date=new Date(year,month-1,day);
+    if(date.getMonth()!==month-1||date.getDate()!==day)continue;
+    const diff=Math.round((date.getTime()-base)/86400000);
+    // 優先近期實際需求，未來 2 週及過去 30 天最有可能是本次作業。
+    const distance=Math.abs(diff)+(diff>14?60:diff< -30?60:0);
+    best=Math.min(best,distance);
+   }
   }
-  score+=latest*10;
+  if(Number.isFinite(best))score+=Math.max(-50000,60000-best*1000);
  }else if(/商品批次|庫存|現貨|工作表1/.test(compact))score+=100000;
- // 順序只用於同分決勝；最終仍必須實際辨識成功。
  return score-index*0.01;
 }
 async function guideAutoChoose(file){
