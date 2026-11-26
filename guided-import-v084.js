@@ -257,7 +257,7 @@ function guideList(){
  for(const r of demand){const code=guideCode(r.lookup9||r.spu);if(code&&!seen.has(code)){seen.add(code);codes.push(code)}}
  return codes;
 }
-function guideQuery(batch){return '貨號:'+guideList().slice(batch*100,batch*100+100).join(' ')}
+function guideQuery(batch){return mode==='new'?'檔期:'+guided.date.replace(/-/g,''):'貨號:'+guideList().slice(batch*100,batch*100+100).join(' ')}
 function guideCopy(){const text=guideQuery(guided.batch);if(!text||text==='貨號:')return;
  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(()=>guideAlert('已複製第 '+(guided.batch+1)+' 批')).catch(()=>guideFallbackCopy(text))}
  else guideFallbackCopy(text);
@@ -286,7 +286,7 @@ function guideNext(target){
   if(mode==='new'&&!newConfirmed){guideAlert('請先確認本次新品配貨門市');return}
   if(!importState.demand.some(f=>f.entries.length)||guideDemandIssues().length){guideAlert('請完成工作表選擇及需求核對');return}
  }
- if(target===3&&!guideList().length){guideAlert('尚無可查詢的 9 碼貨號');return}
+ if(target===3&&mode!=='new'&&!guideList().length){guideAlert('尚無可查詢的 9 碼貨號');return}
  if(target===3&&mode==='new'&&!newConfirmed){guideAlert('請先確認本次新品配貨門市');return}
  if(target===4){
   const t=impTotals();if(!t.demand.length||!t.stock.length||t.warnings.length||importState.errors.length){guideAlert('請先完成需求與庫存比對');return}
@@ -310,8 +310,8 @@ function guideFileMarkup(kind){
 function guideRender(){
  const root=document.getElementById('guidedArea');if(!root)return;
  const demand=importState.demand.flatMap(f=>f.entries),stock=importState.stock.flatMap(f=>f.entries);
- const codes=guideList(),count=Math.ceil(codes.length/100),errors=guideDemandIssues(), t=impTotals();
- const stage=guided.stage,labels=['需求','貨號','庫存'];
+ const codes=guideList(),count=mode==='new'?1:Math.ceil(codes.length/100),errors=guideDemandIssues(), t=impTotals();
+ const stage=guided.stage,labels=['需求',mode==='new'?'檔期':'貨號','庫存'];
  let content='';
  if(stage===1)content='<h3>01｜匯入門市需求</h3>'+ ('<div class="guide-date"><label>本次'+(mode==='new'?'新品檔期':'補貨')+'日期 <input type="date" value="'+guided.date+'" onchange="guideSetDate(this.value)"></label> <button class="'+(guided.dateConfirmed?'':'primary')+'" onclick="guideConfirmDate()">'+(guided.dateConfirmed?'✓ 日期已確認':'確認日期')+'</button></div><p class="sub">以 '+guideMMDD()+' 比對工作表，仍可手動切換。</p>')+
  '<label class="guide-upload">選擇需求檔案 <input aria-label="選擇需求檔案" type="file" multiple accept=".xlsx,.csv" '+(!guided.dateConfirmed?'disabled':'')+' onchange="importFiles(\'demand\',this.files);this.value=\'\'"></label>'+
@@ -322,12 +322,19 @@ function guideRender(){
  if(stage===2){
   guided.batch=Math.min(guided.batch,Math.max(0,count-1));
   const visible=codes.slice(guided.batch*100,(guided.batch+1)*100);
-  content='<h3>02｜後台貨號查詢</h3><p class="sub">不重複 9 碼貨號 '+codes.length+' 個／'+count+' 批，每批最多 100 個。</p>'+
-  '<div class="guide-batches">'+Array.from({length:count},(_,i)=>'<button class="'+(i===guided.batch?'primary':'')+'" onclick="guided.batch='+i+';guideRender()">第 '+(i+1)+' 批（'+Math.min(100,codes.length-i*100)+'）</button>').join('')+'</div>'+
-  '<div class="guide-copy">'+esc('貨號:'+visible.join(' '))+'</div>'+
-  '<button class="primary" onclick="guideCopy()">複製第 '+(guided.batch+1)+' 批</button>'+
-  '<p class="sub">複製後到後台查庫存，查完再上傳庫存檔案。</p>'+
-  '<div class="guide-nav"><button onclick="guideBack()">← 返回需求</button><button class="primary" onclick="guideNext(3)">下一步：匯入庫存 →</button></div>';
+  if(mode==='new'){
+   content='<h3>02｜後台檔期查詢</h3><p class="sub">複製本次檔期，到後台查詢對應庫存。</p>'+
+   '<div class="guide-copy">'+esc(guideQuery(0))+'</div>'+
+   '<button class="primary" onclick="guideCopy()">複製檔期</button>'+
+   '<div class="guide-nav"><button onclick="guideBack()">← 返回需求</button><button class="primary" onclick="guideNext(3)">下一步：匯入庫存 →</button></div>';
+  }else{
+   content='<h3>02｜後台貨號查詢</h3><p class="sub">不重複 9 碼貨號 '+codes.length+' 個／'+count+' 批，每批最多 100 個。</p>'+
+   '<div class="guide-batches">'+Array.from({length:count},(_,i)=>'<button class="'+(i===guided.batch?'primary':'')+'" onclick="guided.batch='+i+';guideRender()">第 '+(i+1)+' 批（'+Math.min(100,codes.length-i*100)+'）</button>').join('')+'</div>'+
+   '<div class="guide-copy">'+esc('貨號:'+visible.join(' '))+'</div>'+
+   '<button class="primary" onclick="guideCopy()">複製第 '+(guided.batch+1)+' 批</button>'+
+   '<p class="sub">複製後到後台查庫存，查完再上傳庫存檔案。</p>'+
+   '<div class="guide-nav"><button onclick="guideBack()">← 返回需求</button><button class="primary" onclick="guideNext(3)">下一步：匯入庫存 →</button></div>';
+  }
  }
  if(stage===3)content='<h3>03｜匯入後台庫存</h3><p class="sub">查完所有批次貨號後，上傳後台庫存，可多檔、分次補充。</p>'+
  '<label class="guide-upload">選擇庫存檔案 <input aria-label="選擇庫存檔案" type="file" multiple accept=".xlsx,.csv" onchange="importFiles(\'stock\',this.files);this.value=\'\'"></label>'+
