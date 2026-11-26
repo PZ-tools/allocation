@@ -1,5 +1,6 @@
 /* PAZZO 0.8.4: guided replenishment / new import and 9-code backend lookup. */
 const guided={stage:1,batch:0,busy:false,error:'',confirmed:false,date:'',dateConfirmed:false};
+function guideNewDay(){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+(7-d.getDay())%7);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 function guideIsoDay(){
  const now=new Date();now.setHours(12,0,0,0);
  const distance=(5-now.getDay()+7)%7;now.setDate(now.getDate()+distance);
@@ -101,7 +102,7 @@ function guideHeader(data,kind,source){
  if(found<0)throw Error(source+'：缺少可辨識的貨號與'+(kind==='stock'?'庫存':'需求')+'表頭');
  return {head:data[found].map(x=>String(x??'').trim()),records:data.slice(found+1)};
 }
-function guideIndex(head,pattern){return head.findIndex(v=>pattern.test(v.replace(/\s+/g,'')))}
+function guideIndex(head,pattern){return head.findIndex(v=>pattern.test(String(v??'').replace(/[\s　]/g,'')))}
 impDemandTable=function(data,source){
  const {head,records}=guideHeader(data,'demand',source);
  const barcodeIdx=guideIndex(head,/^(條碼|SKU|品號)$/i),nineIdx=guideIndex(head,/^(貨號|9碼貨號|九碼貨號|SPU)$/i);
@@ -110,7 +111,7 @@ impDemandTable=function(data,source){
  const sourceStore=impGuessedStore(source),qtyIdx=guideIndex(head,/^(門市)?補貨需求(數|數量)?$|營運確認數|^【2】實體門市叫貨營運確認數$|^(需求|數量|叫貨數量)$/);
  const storeCols=[];
  for(let i=0;i<head.length;i++)for(const store of stores){
-  const col=head[i].replace(/\s+/g,'');
+  const col=String(head[i]??'').replace(/[\s　]/g,'');
   if(col===store||col.startsWith(store+'_'))storeCols.push({i,store,zone:col===store?'':col.slice(store.length+1)});
  }
  if(skuIdx<0||(!storeCols.length&&qtyIdx<0))throw Error(source+'：找不到條碼或補貨需求欄位');
@@ -199,14 +200,14 @@ function guideDemandIssues(){
  for(const f of files){
   if(f.issue)warnings.push(f.name+'：'+f.issue);
   else if(f.selected==='')warnings.push(f.name+' 尚未選擇工作表');
-  else if(mode==='restock'&&f.book&&(!guideSameDate(f.sheets?.[Number(f.selected)]?.name)||!guideBrandMatch(f.sheets?.[Number(f.selected)]?.name,f.name)))warnings.push(f.name+'：工作表不符合本次補貨日期／PAZZO 品牌');
+  else if(f.book&&(!guideSameDate(f.sheets?.[Number(f.selected)]?.name)||(mode==='restock'&&!guideBrandMatch(f.sheets?.[Number(f.selected)]?.name,f.name))))warnings.push(f.name+'：工作表不符合本次日期'+(mode==='restock'?'／PAZZO 品牌':''));
  }
  for(const r of selected){const k=[r.sku,r.store,r.zone].join('|');if(keys.has(k))warnings.push('重複需求：'+r.sku+'／'+r.store+(r.zone?'／'+r.zone:''));keys.add(k)}
  return warnings;
 }
 function guideNext(target){
  if(target===2){
-  if(mode==='restock'&&!guided.dateConfirmed){guideAlert('請先確認本次補貨日期');return}
+  if(!guided.dateConfirmed){guideAlert('請先確認本次'+(mode==='new'?'新品檔期':'補貨')+'日期');return}
   if(mode==='new'&&!newConfirmed){guideAlert('請先確認本次新品配貨門市');return}
   if(!importState.demand.some(f=>f.entries.length)||guideDemandIssues().length){guideAlert('請完成工作表選擇及需求核對');return}
  }
@@ -236,12 +237,12 @@ function guideRender(){
  const codes=guideList(),count=Math.ceil(codes.length/100),errors=guideDemandIssues(), t=impTotals();
  const stage=guided.stage,labels=['需求','貨號','庫存','配貨'];
  let content='';
- if(stage===1)content='<h3>01｜匯入門市需求</h3>'+ (mode==='restock'?'<div class="guide-date"><label>本次補貨日期 <input type="date" value="'+guided.date+'" onchange="guideSetDate(this.value)"></label> <button class="'+(guided.dateConfirmed?'':'primary')+'" onclick="guideConfirmDate()">'+(guided.dateConfirmed?'✓ 日期已確認':'確認日期')+'</button></div><p class="sub">以 '+guideMMDD()+' 比對各店工作表。自動選取後仍可更改，日期不符不能進入下一步。</p>':'<p class="sub">選擇本次新品需求工作表。</p>')+
- '<label class="guide-upload">選擇需求檔案 <input aria-label="選擇需求檔案" type="file" multiple accept=".xlsx,.csv" '+(mode==='restock'&&!guided.dateConfirmed?'disabled':'')+' onchange="importFiles(\'demand\',this.files);this.value=\'\'"></label>'+
+ if(stage===1)content='<h3>01｜匯入門市需求</h3>'+ ('<div class="guide-date"><label>本次'+(mode==='new'?'新品檔期':'補貨')+'日期 <input type="date" value="'+guided.date+'" onchange="guideSetDate(this.value)"></label> <button class="'+(guided.dateConfirmed?'':'primary')+'" onclick="guideConfirmDate()">'+(guided.dateConfirmed?'✓ 日期已確認':'確認日期')+'</button></div><p class="sub">以 '+guideMMDD()+' 比對工作表，仍可手動切換。</p>')+
+ '<label class="guide-upload">選擇需求檔案 <input aria-label="選擇需求檔案" type="file" multiple accept=".xlsx,.csv" '+(!guided.dateConfirmed?'disabled':'')+' onchange="importFiles(\'demand\',this.files);this.value=\'\'"></label>'+
  guideFileMarkup('demand')+
  '<p class="sub">'+(demand.length?'已辨識 '+demand.length+' 筆需求':'尚未匯入需求')+'</p>'+
  (errors.length?'<p class="warn">'+esc(errors.slice(0,3).join('；'))+'</p>':'')+
- '<button class="primary" onclick="guideNext(2)" '+(!demand.length||errors.length||(mode==='new'&&!newConfirmed)||(mode==='restock'&&!guided.dateConfirmed)?'disabled':'')+'>確認需求並整理貨號 →</button>';
+ '<button class="primary" onclick="guideNext(2)" '+(!demand.length||errors.length||(mode==='new'&&!newConfirmed)||(!guided.dateConfirmed)?'disabled':'')+'>確認需求並整理貨號 →</button>';
  if(stage===2){
   guided.batch=Math.min(guided.batch,Math.max(0,count-1));
   const visible=codes.slice(guided.batch*100,(guided.batch+1)*100);
@@ -291,11 +292,11 @@ function guideTabScore(tab,index,kind){
  return score-index*0.01;
 }
 async function guideAutoChoose(file){
- if(file.kind==='demand'&&mode==='restock'){
+ if(file.kind==='demand'){
   const candidates=file.book.tabs.map((tab,i)=>({tab,i})).filter(({tab})=>
-   guideSameDate(tab.name)&&guideBrandMatch(tab.name,file.name));
+   guideSameDate(tab.name)&&(mode==='new'||guideBrandMatch(tab.name,file.name)));
   if(!candidates.length){
-   file.issue='找不到 '+guideMMDD()+' 的 PAZZO 補貨工作表';
+   file.issue='找不到 '+guideMMDD()+(mode==='new'?' 的新品工作表':' 的 PAZZO 補貨工作表');
    file.selected='';file.entries=[];return;
   }
   const valid=[],issues=[];
@@ -327,7 +328,7 @@ async function guideAutoChoose(file){
 }
 importFiles=async function(kind,files){
  if(!files?.length)return;
- if(kind==='demand'&&mode==='restock'&&!guided.dateConfirmed){guided.error='請先確認本次補貨日期';guideRender();return}
+ if(kind==='demand'&&!guided.dateConfirmed){guided.error='請先確認本次補貨日期';guideRender();return}
  guided.error='';
  const array=Array.from(files);
  for(const file of array){
@@ -363,9 +364,9 @@ selectImportedSheet=async function(kind,index,value){
     for(let i=0;i<file.book.tabs.length;i++)file.entries.push(...await guideReadSheet(file,i));
    }else if(value!=='')file.entries=await guideReadSheet(file,Number(value));
   }else{file.entries=value==='all'?file.sheets.flatMap(s=>s.entries):value===''?[]:(file.sheets[Number(value)]?.entries||[])}
-  if(kind==='demand'&&mode==='restock'&&file.book&&value!==''&&
-    (!guideSameDate(file.sheets[Number(value)]?.name)||!guideBrandMatch(file.sheets[Number(value)]?.name,file.name))){
-    file.issue='工作表與本次 '+guideMMDD()+' 補貨日期／品牌不符';
+  if(kind==='demand'&&file.book&&value!==''&&
+    (!guideSameDate(file.sheets[Number(value)]?.name)||(mode==='restock'&&!guideBrandMatch(file.sheets[Number(value)]?.name,file.name)))){
+    file.issue='工作表與本次 '+guideMMDD()+(mode==='new'?' 新品檔期':' 補貨日期／品牌')+' 不符';
   }else file.issue='';
   guided.error='';importState.errors=[];
  }catch(err){file.selected='';file.entries=[];file.issue=err.message;guided.error=file.name+'：'+err.message;importState.errors=[guided.error]}
@@ -376,7 +377,7 @@ removeImported=function(kind,index){guideOldRemove(kind,index);guided.error='';g
 const guideOldReset=clearImportState;
 clearImportState=function(){guideOldReset();guided.stage=1;guided.batch=0;guided.error='';guided.dateConfirmed=false;guideRender()};
 const guideOldSetMode=setMode;
-setMode=function(m){guideOldSetMode(m);guided.stage=1;guideRender()};
+setMode=function(m){guideOldSetMode(m);guided.stage=1;guided.date=m==='new'?guideNewDay():guideIsoDay();guided.dateConfirmed=false;guideRender()};
 const guideOldConfirmed=confirmNewEntry;
 confirmNewEntry=function(){guideOldConfirmed();guideRender()};
 renderNewEntry=function(){
