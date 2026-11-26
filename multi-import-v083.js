@@ -206,7 +206,7 @@ function makeImportRows(){
 }
 function downloadImportDemo(kind){
  if(kind==='demand')download('PAZZO_需求測試.csv',makeCsv([
-  ['SKU','SPU','檔期','品名','尺寸',...stores],
+  ['SKU','SPU','檔期','品名','尺寸',...stores.map(st=>st==='文心'?'文心_1F倉庫':st==='光復'?'光復_2F倉庫':st)],
   ['PZ-DEMO-001-S','PZ-DEMO-001','20261130','模擬商品','S',2,3,2,1,3,1,1,1,0],
   ['PZ-DEMO-001-M','PZ-DEMO-001','20261130','模擬商品','M',2,3,2,1,3,1,1,1,0]
  ]));
