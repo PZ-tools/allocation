@@ -1087,7 +1087,11 @@ function summarySheetXml(records,opts={}){
  const cellRows=records.map((r,ri)=>{
   const cells=r.map((v,ci)=>{
    if(v===null||v===undefined||v==='')return '';
-   const reference=summaryExcelCol(ci)+(ri+1),style=ri===0?' s="1"':ri>0&&ri<headerLimit?' s="2"':'';
+   const reference=summaryExcelCol(ci)+(ri+1);
+   const storeForCell=opts.storeCols!=null&&ci>=opts.storeCols&&ci<opts.storeCols+stores.length?
+    stores[ci-opts.storeCols]:opts.storeField!=null&&ri>0?String(r[opts.storeField]||''):'';
+   const index=stores.indexOf(storeForCell);
+   const style=index>=0?' s="'+(3+index)+'"':ri===0?' s="1"':ri>0&&ri<headerLimit?' s="2"':'';
    if(typeof v==='number'&&Number.isFinite(v))return '<c r="'+reference+'"'+style+'><v>'+v+'</v></c>';
    return '<c r="'+reference+'"'+style+' t="inlineStr"><is><t xml:space="preserve">'+summaryXmlEscape(v)+'</t></is></c>';
   }).join('');
@@ -1105,9 +1109,9 @@ function summaryXlsxBlob(mainRows,detailRows){
   '_rels/.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
   'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="配貨總覽" sheetId="1" r:id="rId1"/><sheet name="數量確認" sheetId="2" r:id="rId2"/></sheets></workbook>',
   'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
-  'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF302B29"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1EDE9"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
-  'xl/worksheets/sheet1.xml':summarySheetXml(mainRows,{headerLimit:4}),
-  'xl/worksheets/sheet2.xml':summarySheetXml(detailRows)
+  'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF302B29"/><name val="Arial"/></font></fonts><fills count="12"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1EDE9"/><bgColor indexed="64"/></patternFill></fill>'+colors.map(c=>'<fill><patternFill patternType="solid"><fgColor rgb="FF'+c.slice(1).toUpperCase()+'"/><bgColor indexed="64"/></patternFill></fill>').join('')+'</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="12"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+colors.map((c,i)=>'<xf numFmtId="0" fontId="0" fillId="'+(i+3)+'" borderId="0" xfId="0" applyFill="1"/>').join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+  'xl/worksheets/sheet1.xml':summarySheetXml(mainRows,{headerLimit:4,storeCols:3}),
+  'xl/worksheets/sheet2.xml':summarySheetXml(detailRows,{storeField:2})
  };
  const data=Object.entries(entries).map(([name,contents])=>{
   const bytes=enc.encode(contents);
