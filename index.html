@@ -2465,7 +2465,7 @@ const oldZeroGroup0811=updateZeroGroup,oldZeroSku0811=updateZeroSku;
 updateZeroGroup=function(encoded,checked){if(mode==='new')newToggleZeroGroup(encoded,checked);else oldZeroGroup0811(encoded,checked)};
 updateZeroSku=function(i,checked){if(mode==='new')newToggleZeroSku(i,checked);else oldZeroSku0811(i,checked)};
 function newRenderStoreJump(activeStores){
- const host=document.getElementById('work'),table=host.querySelector('.tablebox');
+ const host=document.getElementById('work'),table=host.querySelector(':scope > .card > .tablebox');
  if(!table)return;
  let nav=document.getElementById('newStoreJump');
  if(!nav){nav=document.createElement('div');nav.id='newStoreJump';nav.className='store-jump';table.before(nav)}
