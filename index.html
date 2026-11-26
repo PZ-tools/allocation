@@ -2197,11 +2197,15 @@ function newSetQty(ri,si,textValue){
    (store==='大隆'&&!includeDalong)){
   alert('實際件數必須在需求範圍內');render();return;
  }
- const before=row.qty[si];row.qty[si]=qty;
+ const before=row.qty[si];if(before===qty)return;
+ row.qty[si]=qty;
  if(newQtyTotal(row)>cap(row)){
   row.qty[si]=before;alert('超過此 SKU 的庫存配貨上限');render();return;
  }
- // Manually entered zones are retained for review, rather than silently reassigned.
+ row.qty[si]=before;
+ newRememberChange();
+ row.qty[si]=qty;
+ // Existing manual zone quantities remain visible and flagged if the total no longer matches.
  render();
 }
 function newSetZone(ri,store,zone,textValue){
@@ -2209,6 +2213,8 @@ function newSetZone(ri,store,zone,textValue){
  if(!row||!Number.isInteger(value)||value<0||value>q||!newZonePairs[store]?.includes(zone)){
   alert('倉庫／陳列須填入 0 至實際配貨量的整數');render();return;
  }
+ if(newZoneState(row,store).values[zone]===value)return;
+ newRememberChange();
  row.zoneManual??={};
  if(!row.zoneManual[store])row.zoneManual[store]={...newZoneState(row,store).values};
  row.zoneManual[store][zone]=value;
@@ -2230,6 +2236,7 @@ function newGridIssues(){
 }
 function newWorkbenchRender(){
  if(step!=='work'||mode!=='new')return;
+ newEnsureInitial();
  const host=document.getElementById('work');
  host.classList.add('new-workbench');
  document.getElementById('workTitle').textContent='新品｜逐筆配貨確認';
@@ -2292,6 +2299,121 @@ function newWorkbenchRender(){
   '<span class="pill">待確認 '+issues.length+' 筆</span>';
  document.getElementById('alerts').innerHTML=issues.length?'<p class="warn">'+esc(issues.slice(0,5).join('；'))+'</p>':'';
 }
+
+/* v0.8.11: undo to the first imported allocation; isolated to the new-arrivals mode. */
+let newHistory=[],newInitialSnapshot=null,newZeroExpanded=false;
+function newSnapshot(){
+ return JSON.stringify({items:rows.map(r=>({
+  qty:r.qty.slice(),blocked:!!r.blocked,
+  zoneManual:r.zoneManual??null,beforeZero:r._beforeZero??null
+ })),reasons:{...zeroReasons}});
+}
+function newApplySnapshot(savedState){
+ const state=JSON.parse(savedState);
+ if(state.items.length!==rows.length)throw Error('配貨筆數已變更，不能套用舊操作紀錄');
+ rows.forEach((r,i)=>{
+  const snapshot=state.items[i];
+  r.qty=snapshot.qty.slice();r.blocked=snapshot.blocked;
+  if(snapshot.zoneManual===null)delete r.zoneManual;
+  else r.zoneManual=JSON.parse(JSON.stringify(snapshot.zoneManual));
+  if(snapshot.beforeZero===null)delete r._beforeZero;
+  else r._beforeZero=JSON.parse(JSON.stringify(snapshot.beforeZero));
+ });
+ zeroReasons=state.reasons;
+}
+function newResetHistory(){newHistory=[];newInitialSnapshot=null;newZeroExpanded=false}
+function newEnsureInitial(){
+ if(mode==='new'&&step==='work'&&newInitialSnapshot===null){
+  newInitialSnapshot=newSnapshot();newHistory=[];
+ }
+}
+function newRememberChange(){newEnsureInitial();newHistory.push(newSnapshot())}
+function newUndo(){
+ if(mode!=='new'||!newHistory.length)return;
+ newApplySnapshot(newHistory.pop());render();
+}
+function newInitialize(){
+ if(mode!=='new'||!newInitialSnapshot)return;
+ if(!confirm('確定要初始化嗎？目前所有人工調整將恢復為本次匯入後的初始狀態，並清除上一步紀錄。'))return;
+ newApplySnapshot(newInitialSnapshot);newHistory=[];render();
+}
+function newZeroMarkup(){
+ const groups=[...new Set(rows.map(r=>r.spu))];
+ return '<details '+(newZeroExpanded?'open':'')+' ontoggle="newZeroExpanded=this.open">'+
+  '<summary style="cursor:pointer;font-weight:700;padding:11px 10px">當次新品歸零勾選（'+groups.length+' 組貨號）</summary>'+
+  '<div class="tablebox" style="max-height:42vh"><table class="zero-table" style="min-width:550px"><thead>'+
+  '<tr><th>9 碼貨號</th><th>原因</th><th>尺寸</th></tr></thead><tbody>'+
+  groups.map(code=>{
+   const group=rows.map((r,i)=>({r,i})).filter(x=>x.r.spu===code);
+   const reason=zeroReasons[code]||'',encoded=encodeURIComponent(code);
+   return '<tr><td><label><input type="checkbox" '+(group.every(({r})=>r.blocked)?'checked':'')+
+    ' onchange="newToggleZeroGroup(\''+encoded+'\',this.checked)"> <b>'+esc(code)+'</b></label></td>'+
+    '<td><select onchange="newSetZeroReason(\''+encoded+'\',this.value)"><option value="">選擇原因</option>'+
+    ['尚未入庫','官網預購','分批到貨'].map(v=>'<option value="'+v+'" '+(v===reason?'selected':'')+'>'+v+'</option>').join('')+
+    '</select></td><td>'+group.map(({r,i})=>'<label class="pill"><input type="checkbox" '+(r.blocked?'checked':'')+
+    ' onchange="newToggleZeroSku('+i+',this.checked)"> '+esc(r.size||'尺寸待確認')+'</label>').join(' ')+'</td></tr>';
+  }).join('')+'</tbody></table></div></details>';
+}
+function newSetZeroReason(encoded,value){
+ const code=decodeURIComponent(encoded);
+ if((zeroReasons[code]||'')===value)return;
+ newRememberChange();
+ if(value)zeroReasons[code]=value;else delete zeroReasons[code];
+ render();
+}
+function newZeroSet(row,checked){
+ if(row.blocked===checked)return;
+ if(checked){
+  row._beforeZero={qty:row.qty.slice(),zoneManual:row.zoneManual?JSON.parse(JSON.stringify(row.zoneManual)):null};
+  row.qty=stores.map(()=>0);delete row.zoneManual;row.blocked=true;
+ }else{
+  row.blocked=false;
+  if(row._beforeZero){
+   const prev=row._beforeZero;row.qty=prev.qty.slice();
+   if(prev.zoneManual===null)delete row.zoneManual;
+   else row.zoneManual=JSON.parse(JSON.stringify(prev.zoneManual));
+   delete row._beforeZero;
+   if(newQtyTotal(row)>cap(row)||row.qty.some((q,i)=>q>Number(row.demand[i]||0))){
+    // Never restore an invalid quantity after external input/rule changes.
+    row.qty=stores.map(()=>0);delete row.zoneManual;
+    alert(row.sku+' 原數量已不符合目前庫存／需求限制，暫不恢復，請人工確認');
+   }
+  }
+ }
+}
+function newToggleZeroGroup(encoded,checked){
+ const code=decodeURIComponent(encoded),targets=rows.filter(r=>r.spu===code&&r.blocked!==checked);
+ if(!targets.length)return;
+ newRememberChange();targets.forEach(r=>newZeroSet(r,checked));render();
+}
+function newToggleZeroSku(i,checked){
+ if(!rows[i]||rows[i].blocked===checked)return;
+ newRememberChange();newZeroSet(rows[i],checked);render();
+}
+// Existing form handlers remain valid, but new arrivals no longer reallocate all SKUs on zero changes.
+const oldZeroGroup0811=updateZeroGroup,oldZeroSku0811=updateZeroSku;
+updateZeroGroup=function(encoded,checked){if(mode==='new')newToggleZeroGroup(encoded,checked);else oldZeroGroup0811(encoded,checked)};
+updateZeroSku=function(i,checked){if(mode==='new')newToggleZeroSku(i,checked);else oldZeroSku0811(i,checked)};
+function newRenderStoreJump(activeStores){
+ const host=document.getElementById('work'),table=host.querySelector('.tablebox');
+ if(!table)return;
+ let nav=document.getElementById('newStoreJump');
+ if(!nav){nav=document.createElement('div');nav.id='newStoreJump';nav.className='store-jump';table.before(nav)}
+ nav.innerHTML='<span class="sub">快速定位門市：</span>'+activeStores.map(store=>
+  '<button style="background:'+colors[stores.indexOf(store)]+'" onclick="newJumpStore(\''+store+'\')">'+esc(store)+'</button>').join('');
+}
+function newJumpStore(store){
+ const table=document.querySelector('#work.new-workbench .tablebox');
+ const th=[...document.querySelectorAll('#work.new-workbench th.group-head')].find(el=>el.dataset.store===store);
+ if(!table||!th)return;
+ const pos=th.getBoundingClientRect().left-table.getBoundingClientRect().left+table.scrollLeft-250;
+ table.scrollTo({left:Math.max(0,pos),behavior:'smooth'});
+}
+const oldStep0811=setStep;
+setStep=function(target){if(mode==='new'&&target==='home')newResetHistory();oldStep0811(target)};
+const oldMode0811=setMode;
+setMode=function(value){newResetHistory();oldMode0811(value)};
+
 const newWorkbenchOldRender=render;
 render=function(){
  newWorkbenchOldRender();
