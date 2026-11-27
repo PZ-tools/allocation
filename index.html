@@ -14,7 +14,8 @@
 #work.new-workbench > .card > .tablebox .qty-input{width:65px;min-width:65px;padding:5px 4px;text-align:center}
 #work.new-workbench > .card > .tablebox .store-cell{background:var(--store-color)}
 #work.new-workbench > .card > .tablebox .store-cell.store-zone{background:var(--store-deep)}
-#work.new-workbench > .card > .tablebox .group-total{font-weight:700;background:#f6f1eb}
+#work.new-workbench > .card > .tablebox .group-total{font-weight:700;background:#dfc0a4}
+#work.new-workbench > .card > .tablebox .new-available{font-weight:700;background:#f4e8db}
 #work.new-workbench > .card > .tablebox .grid-invalid{background:#ffe6e1!important}
 #work.new-workbench > .card > .tablebox .grid-warning{background:#fff2d8!important}
 
@@ -1897,6 +1898,21 @@ function guideNewDemandTable(data,source){
  const colorCol=column(/^顏色$/),sizeCol=column(/^(尺寸|尺碼|規格)$/);
  const availabilityCol=column(/^可叫貨總量$/);
  if(barcodeCol<0)throw Error(source+'：無法確認完整13碼品號欄位，停止辨識');
+ // Capture brand availability even when the first size has no store order.
+ const availableByGroup=new Map();
+ if(availabilityCol>=0)for(let r=header.r+1;r<data.length;r++){
+  const product=data[r]||[],barcode=String(product[barcodeCol]??'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{13}$/.test(barcode))continue;
+  const spu=(nineCol<0?'':guideCode(product[nineCol]))||barcode.slice(0,9);
+  const color=colorCol<0?'':String(product[colorCol]??'').trim();
+  const raw=String(product[availabilityCol]??'').trim();
+  if(!raw)continue;
+  if(!/^\d+$/.test(raw))throw Error(source+'：第 '+(r+1)+' 列可叫貨總量不是非負整數');
+  const group=spu+'|'+color,amount=Number(raw);
+  if(availableByGroup.has(group)&&availableByGroup.get(group)!==amount)
+   throw Error(source+'：可叫貨總量重複且不一致 '+group);
+  availableByGroup.set(group,amount);
+ }
  const entries=[],seen=new Set(),targetPeriod=guided.date.replace(/-/g,'');
  for(let r=header.r+1;r<data.length;r++){
   const row=data[r]||[],barcode=String(row[barcodeCol]??'').trim().toUpperCase();
@@ -1908,7 +1924,8 @@ function guideNewDemandTable(data,source){
   const nine=explicit||barcode.slice(0,9);
   const rawAvailable=availabilityCol<0?'':String(row[availabilityCol]??'').trim();
   if(rawAvailable&&!/^\d+$/.test(rawAvailable))throw Error(source+'：第 '+(r+1)+' 列可叫貨總量不是非負整數');
-  const base={sku:barcode,spu:nine,lookup9:nine,zone:'',availableQty:rawAvailable===''?null:Number(rawAvailable),
+  const sourceColor=colorCol<0?'':String(row[colorCol]??'').trim();
+  const base={sku:barcode,spu:nine,lookup9:nine,zone:'',availableQty:availableByGroup.get(nine+'|'+sourceColor)??null,
    size:sizeCol<0?'':String(row[sizeCol]??'').trim(),
    name:nameCol<0?'':String(row[nameCol]??'').trim(),
    color:colorCol<0?'':String(row[colorCol]??'').trim(),
@@ -2326,6 +2343,7 @@ function newWorkbenchRender(){
  const groups=new Map();
  rows.forEach((row,index)=>{if(!groups.has(row.spu))groups.set(row.spu,[]);groups.get(row.spu).push({row,index})});
  const sortedGroups=[...groups.entries()].sort(([a],[b])=>newCompareNineCode(a,b));
+ for(const [,items] of sortedGroups)items.sort((a,b)=>String(a.row.color||'').localeCompare(String(b.row.color||''),'zh-Hant'));
  const activeStores=stores.filter(store=>store!=='大隆'||includeDalong);
  const actions=document.getElementById('workActions');
  if(actions)actions.innerHTML='<button class="primary" onclick="approve()">套用</button>'+
@@ -2349,7 +2367,7 @@ function newWorkbenchRender(){
   toggle.innerHTML='<button type="button" onclick="newToggleMeta()">'+(newMetaCollapsed?'＋ 展開商品資訊':'－ 收合商品資訊')+'</button>';
  }
  // Preserve all widths of the visible existing columns and every store column.
- const detailWidths=newMetaCollapsed?[]:[190,132,55,72];
+ const detailWidths=newMetaCollapsed?[]:[190,132,55,72,72];
  const colWidths=[105,65,45,...detailWidths,65,65];
  for(const store of activeStores)colWidths.push(...newStoreParts(store).map(t=>t==='需求'?48:58));
  const table=host.querySelector(':scope > .card > .tablebox > table');
@@ -2362,7 +2380,7 @@ function newWorkbenchRender(){
   colgroup.innerHTML=colWidths.map(width=>'<col style="width:'+width+'px">').join('');
   table.prepend(colgroup);
  }
- const metaHeads=newMetaCollapsed?[]:['品名','品號','庫存','總叫貨'];
+ const metaHeads=newMetaCollapsed?[]:['品名','品號','庫存','可叫數','總叫貨'];
  const heads=['貨號','顏色','尺寸',...metaHeads,'配貨數','EC剩餘'];
  document.getElementById('thead').innerHTML='<tr>'+
   heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+'</th>').join('')+
@@ -2376,7 +2394,14 @@ function newWorkbenchRender(){
  const sumStock=rows.reduce((sum,r)=>sum+Number(r.stock||0),0);
  const sumAllocated=rows.reduce((sum,r)=>sum+newQtyTotal(r),0);
  const sumRemaining=sumStock-sumAllocated;
- const numbers=newMetaCollapsed?[sumAllocated,sumRemaining]:[sumStock,orderedTotal,sumAllocated,sumRemaining];
+ const availabilityTotals=new Map();
+ for(const row of rows){
+  if(row.availableQty==null)continue;
+  const group=row.spu+'|'+String(row.color||'');
+  if(!availabilityTotals.has(group))availabilityTotals.set(group,Number(row.availableQty));
+ }
+ const availableSum=availabilityTotals.size?[...availabilityTotals.values()].reduce((a,b)=>a+b,0):'';
+ const numbers=newMetaCollapsed?[sumAllocated,sumRemaining]:[sumStock,availableSum,orderedTotal,sumAllocated,sumRemaining];
  for(const store of activeStores){
   const si=stores.indexOf(store);
   numbers.push(rows.reduce((sum,r)=>sum+newVisibleDemand(r,si),0));
@@ -2403,6 +2428,13 @@ function newWorkbenchRender(){
     cells+='<td class="meta-cell name-cell" title="'+esc(row.name)+'">'+esc(row.name)+'</td>'+
      '<td class="meta-cell sku-cell">'+esc(row.sku)+'</td>'+
      '<td class="number-cell stock-cell">'+Number(row.stock||0)+'</td>';
+    // Available quantity belongs to SPU + color, never each size separately.
+    const beforeSameColor=items.slice(0,k).some(x=>String(x.row.color||'')===String(row.color||''));
+    if(!beforeSameColor){
+     const colorCount=items.filter(x=>String(x.row.color||'')===String(row.color||'')).length;
+     const available=row.availableQty==null?'':Number(row.availableQty);
+     cells+='<td class="new-available number-cell" rowspan="'+colorCount+'">'+available+'</td>';
+    }
     if(k===0)cells+='<td class="group-total total-cell" rowspan="'+items.length+'">'+total+'</td>';
    }
    cells+='<td class="number-cell">'+allocated+'</td>'+
