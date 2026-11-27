@@ -1265,8 +1265,9 @@ savePriority=saveCommonOrder;
 cap=function(r){
  const stock=Math.max(0,Math.floor(Number(r.stock)||0));
  if(mode==='restock')return xinyiRule==='unrestricted'?stock:Math.max(0,stock-Number(saved.restock.safe||0));
- // New arrivals preserve confirmed orders even when EC remaining becomes negative.
- return Number.MAX_SAFE_INTEGER;
+ // New-arrival automatic allocation retains at least half of positive SKU stock.
+ // A zero-stock SKU remains visible with its actual order and negative EC balance.
+ return stock===0?Number.MAX_SAFE_INTEGER:Math.floor(stock/2);
 };
 function xinyiRestockViolation(r){
  if(mode!=='restock'||xinyiRule!=='unrestricted')return false;
