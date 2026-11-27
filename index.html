@@ -105,7 +105,7 @@
 <div class="row"><button class="primary" onclick="copyAllLine()">複製全部門市 LINE 資訊</button><button onclick="renderLineNotices()">依最新配貨重新整理</button></div>
 <textarea id="lineAll" rows="24" style="width:100%;font-family:ui-monospace,monospace;font-size:13px;line-height:1.7;border:1px solid #d8cbc0;border-radius:10px;padding:12px;resize:vertical"></textarea>
 <div id="lineWarning" class="sub" style="display:none"></div></div><div id="exportStatus" class="sub"></div></section>
-<dialog id="contextHelpDialog" class="help-dialog" aria-labelledby="contextHelpTitle" aria-describedby="contextHelpText"><h3 id="contextHelpTitle"></h3><p id="contextHelpText"></p><button type="button" onclick="document.getElementById('contextHelpDialog').close()">關閉</button></dialog>
+<dialog id="contextHelpDialog" class="help-dialog" aria-labelledby="contextHelpTitle" aria-describedby="contextHelpText"><h3 id="contextHelpTitle"></h3><div id="contextHelpText"></div><button type="button" onclick="document.getElementById('contextHelpDialog').close()">關閉</button></dialog>
 <footer><div>此測試網站程式碼公開；請勿將公司內部 Excel、Google Sheets 憑證、密碼或真實營運資料寫入 GitHub 倉庫。檔案讀取與計算在瀏覽器端執行。</div></footer></main><script>
 const stores=['信義','西門','ATT','文心','南西','光復','民族','板橋','大隆'];
 const colors=['#fae0e1','#f9e5d4','#fff5dd','#e5f3e7','#dceafb','#ece3fb','#ffdfc2','#f1d9e7','#e8d8d0'];
@@ -2457,44 +2457,49 @@ function newDownloadDetails(){
 }
 
 /* Shared inline help used by both new-arrival and restock controls. */
-const contextHelpContent={
- available:['可叫數','品牌分配給門市數量'],
- demand:['總叫數','SPU叫貨總數量'],
- allocated:['配貨數','SKU叫貨總數量'],
- reimport:['重新匯入','返回資料匯入，可更換需求或庫存檔案'],
- initialize:['初始化','恢復成最一開始的自動配貨狀態'],
- undo:['上一步','還原前一次人工修改'],
- detail:['細節下載','把當前的配貨細節下載為 Excel 檔'],
- recalculate:['重新計算建議','依目前需求、庫存與配貨優先順序重新計算，會覆蓋人工調整'],
- restoreSuggestion:['還原建議','恢復最近一次自動計算的配貨數量，並非逐步復原'],
- apply:['套用','驗證目前配貨數量，確認後進入配貨結果頁']
-};
-function contextHelpIcon(key){
- if(!contextHelpContent[key])return '';
- return '<button type="button" class="help-icon" aria-label="說明：'+contextHelpContent[key][0]+'" title="查看說明" onclick="showContextHelp(event,\''+key+'\')">ⓘ</button>';
-}
-function showContextHelp(event,key){
+/* One shared help entry beside the work title, in both allocation modes. */
+function showAllocationHelp(event){
  if(event){event.preventDefault();event.stopPropagation()}
- const info=contextHelpContent[key],dialog=document.getElementById('contextHelpDialog');
- if(!info||!dialog)return;
- document.getElementById('contextHelpTitle').textContent=info[0];
- document.getElementById('contextHelpText').textContent=info[1];
+ const dialog=document.getElementById('contextHelpDialog');
+ if(!dialog)return;
+ document.getElementById('contextHelpTitle').textContent='說明';
+ document.getElementById('contextHelpText').innerHTML=
+  '<strong>操作說明</strong>'+
+  '<div>初始化：恢復成最一開始的自動配貨狀態</div>'+
+  '<div>重新匯入：返回資料匯入，可更換需求或庫存檔案</div>'+
+  '<div>細節下載：把當前的配貨細節下載為 Excel 檔</div>'+
+  '<strong style="display:block;margin-top:12px">新品</strong>'+
+  '<div>可叫數：品牌分配給門市數量</div>'+
+  '<div>總叫貨：SPU叫貨總數量</div>'+
+  '<div>配貨數：SKU叫貨總數量</div>';
  if(dialog.open)dialog.close();
  dialog.showModal();
 }
-function attachRestockContextHelp(){
+function attachAllocationHelp(){
+ if(step!=='work')return;
+ const title=document.getElementById('workTitle');
+ if(!title)return;
+ if(title.querySelector('#allocationHelpButton'))return;
+ const button=document.createElement('button');
+ button.type='button';
+ button.id='allocationHelpButton';
+ button.className='help-icon';
+ button.setAttribute('aria-label','查看完整說明');
+ button.title='查看完整說明';
+ button.textContent='ⓘ';
+ button.onclick=showAllocationHelp;
+ title.appendChild(button);
+}
+function alignRestockApplyRight(){
  if(mode!=='restock'||step!=='work')return;
- const container=document.getElementById('workActions');
- if(!container)return;
- const keys=['reimport','recalculate','restoreSuggestion','apply'];
- container.querySelectorAll(':scope > button').forEach((button,i)=>{
-  const key=keys[i];if(!key||button.nextElementSibling?.dataset?.helpFor===key)return;
-  const shell=document.createElement('span');
-  shell.dataset.helpFor=key;
-  shell.style.display='inline-flex';shell.style.alignItems='center';
-  shell.innerHTML=contextHelpIcon(key);
-  button.after(shell);
- });
+ const actions=document.getElementById('workActions');
+ if(!actions)return;
+ actions.style.display='flex';
+ actions.style.alignItems='center';
+ actions.style.flexWrap='wrap';
+ actions.style.gap='8px';
+ const apply=[...actions.querySelectorAll(':scope > button')].find(b=>b.classList.contains('primary'));
+ if(apply){apply.style.marginLeft='auto';actions.appendChild(apply)}
 }
 
 function newWorkbenchRender(){
@@ -2503,6 +2508,7 @@ function newWorkbenchRender(){
  const host=document.getElementById('work');
  host.classList.add('new-workbench');
  document.getElementById('workTitle').textContent='新品｜逐筆配貨確認';
+ attachAllocationHelp();
  const groups=new Map();
  rows.forEach((row,index)=>{if(!groups.has(row.spu))groups.set(row.spu,[]);groups.get(row.spu).push({row,index})});
  const sortedGroups=[...groups.entries()].sort(([a],[b])=>newCompareNineCode(a,b));
@@ -2514,12 +2520,12 @@ function newWorkbenchRender(){
   actions.style.alignItems='center';
   actions.style.flexWrap='wrap';
   actions.style.gap='8px';
-  actions.innerHTML='<span style="display:inline-flex;align-items:center"><button onclick="setStep(\'home\')">重新匯入</button>'+contextHelpIcon('reimport')+'</span>'+
-   '<span style="display:inline-flex;align-items:center"><button onclick="newInitialize()">初始化</button>'+contextHelpIcon('initialize')+'</span>'+
-   '<span style="display:inline-flex;align-items:center"><button onclick="newUndo()" '+(!newHistory.length?'disabled':'')+'>上一步'+(newHistory.length?'（'+newHistory.length+'）':'')+'</button>'+contextHelpIcon('undo')+'</span>'+
+  actions.innerHTML='<button onclick="setStep(\'home\')">重新匯入</button>'+
+   '<button onclick="newInitialize()">初始化</button>'+
+   '<button onclick="newUndo()" '+(!newHistory.length?'disabled':'')+'>上一步'+(newHistory.length?'（'+newHistory.length+'）':'')+'</button>'+
    '<span style="flex:1;min-width:12px"></span>'+
-   '<button class="primary" onclick="approve()">套用</button>'+
-   '<span style="display:inline-flex;align-items:center"><button onclick="newDownloadDetails()">細節下載</button>'+contextHelpIcon('detail')+'</span>';
+   '<button onclick="newDownloadDetails()">細節下載</button>'+
+   '<button class="primary" onclick="approve()">套用</button>';
  }
  const controls=document.getElementById('newControls');
  if(controls){
@@ -2554,7 +2560,7 @@ function newWorkbenchRender(){
  const metaHeads=newMetaCollapsed?[]:['品名','品號','庫存','可叫數','總叫數'];
  const heads=['貨號','顏色','尺寸',...metaHeads,'配貨數','EC剩餘'];
  document.getElementById('thead').innerHTML='<tr>'+
-  heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+(title==='可叫數'?contextHelpIcon('available'):title==='總叫數'?contextHelpIcon('demand'):title==='配貨數'?contextHelpIcon('allocated'):'')+'</th>').join('')+
+  heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+'</th>').join('')+
   activeStores.map(store=>'<th class="group-head" data-store="'+esc(store)+'" colspan="'+newStoreParts(store).length+'" style="background:'+colors[stores.indexOf(store)]+'">'+esc(store)+'</th>').join('')+
   '</tr><tr>'+activeStores.map(store=>newStoreParts(store).map(label=>
    '<th class="group-sub '+(label==='倉庫'||label==='陳列'?'store-zone-head':'')+'" style="background:'+(label==='倉庫'||label==='陳列'?newStoreZoneColor(store):colors[stores.indexOf(store)])+'">'+label+'</th>').join('')).join('')+'</tr>';
@@ -2796,7 +2802,11 @@ render=function(){
   newWorkbenchOldRender();
   document.getElementById('work')?.classList.remove('new-workbench');
   // The collapse control belongs only to the new-arrivals grid.
-  if(mode==='restock'){document.getElementById('newMetaToggle')?.remove();attachRestockContextHelp()}
+  if(mode==='restock'){
+   document.getElementById('newMetaToggle')?.remove();
+   attachAllocationHelp();
+   alignRestockApplyRight();
+  }
  }
 };
 
