@@ -97,7 +97,7 @@
 <div class="row"><button class="primary" onclick="copyAllLine()">複製全部門市 LINE 資訊</button><button onclick="renderLineNotices()">依最新配貨重新整理</button></div>
 <textarea id="lineAll" rows="24" style="width:100%;font-family:ui-monospace,monospace;font-size:13px;line-height:1.7;border:1px solid #d8cbc0;border-radius:10px;padding:12px;resize:vertical"></textarea>
 <div id="lineWarning" class="sub" style="display:none"></div></div><div id="exportStatus" class="sub"></div></section>
-<footer><div style="margin-bottom:12px"><strong>新品配貨欄位說明</strong><div style="margin-top:7px;line-height:1.9">可叫數：品牌分配給門市數量<br>總叫貨：SPU叫貨總數量<br>配貨數：SKU叫貨總數量</div></div><div>此測試網站程式碼公開；請勿將公司內部 Excel、Google Sheets 憑證、密碼或真實營運資料寫入 GitHub 倉庫。檔案讀取與計算在瀏覽器端執行。</div></footer></main><script>
+<footer><div style="margin-bottom:12px"><strong>新品配貨欄位說明</strong><div style="margin-top:7px;line-height:1.9">可叫數：品牌分配給門市數量<br>總叫貨：SPU叫貨總數量<br>配貨數：SKU叫貨總數量</div></div><div style="margin-bottom:12px"><strong>新品操作說明</strong><div style="margin-top:7px;line-height:1.9">初始化：恢復成最一開始的自動配貨狀態<br>重新匯入：返回資料匯入，可更換需求或庫存檔案<br>細節下載：把當前的配貨細節下載為 Excel 檔</div></div><div>此測試網站程式碼公開；請勿將公司內部 Excel、Google Sheets 憑證、密碼或真實營運資料寫入 GitHub 倉庫。檔案讀取與計算在瀏覽器端執行。</div></footer></main><script>
 const stores=['信義','西門','ATT','文心','南西','光復','民族','板橋','大隆'];
 const colors=['#fae0e1','#f9e5d4','#fff5dd','#e5f3e7','#dceafb','#ece3fb','#ffdfc2','#f1d9e7','#e8d8d0'];
 const defaults={restock:{safe:9,threshold:9,priority:['南西','ATT','西門','信義','文心','板橋','民族','光復','大隆']},new:{safe:0,threshold:0,priority:['南西','ATT','西門','信義','文心','板橋','民族','光復','大隆']}};
@@ -2334,6 +2334,73 @@ function newGridIssues(){
  }
  return issues;
 }
+/* On-demand one-sheet snapshot of the current new-arrival allocation, with no approval or state changes. */
+function newDetailRows(){
+ const active=stores.filter(store=>store!=='大隆'||includeDalong);
+ const headers=['貨號','顏色','尺寸','品名','品號','庫存','可叫數','總叫數','配貨數','EC剩餘','歸零原因'];
+ for(const store of active)headers.push(...newStoreParts(store).map(part=>store+'_'+part));
+ const sorted=rows.slice().sort((a,b)=>newCompareNineCode(a.spu,b.spu)||
+  String(a.color||'').localeCompare(String(b.color||''),'zh-Hant')||
+  String(a.size||'').localeCompare(String(b.size||''),'en',{numeric:true}));
+ const groups=new Map(),available=new Map();
+ for(const row of sorted){
+  if(!groups.has(row.spu))groups.set(row.spu,0);
+  groups.set(row.spu,groups.get(row.spu)+newDemandTotal(row));
+  const key=row.spu+'|'+String(row.color||'');
+  if(row.availableQty!=null&&!available.has(key))available.set(key,Number(row.availableQty));
+ }
+ const records=[headers];
+ for(const row of sorted){
+  const q=newQtyTotal(row),key=row.spu+'|'+String(row.color||'');
+  const data=[row.spu,row.color||'',row.size||'',row.name||'',row.sku,
+   Number(row.stock||0),available.has(key)?available.get(key):'',
+   groups.get(row.spu),q,Number(row.stock||0)-q,
+   row.blocked?(zeroReasons[row.spu]||'已歸零'):''];
+  for(const store of active){
+   const idx=stores.indexOf(store);
+   data.push(newVisibleDemand(row,idx),Number(row.qty[idx]||0));
+   if(newZonePairs[store]?.length>1){
+    const zone=newZoneState(row,store);
+    for(const name of newZonePairs[store])data.push(zone.verified?Number(zone.values[name]||0):'待確認');
+   }
+  }
+  records.push(data);
+ }
+ return records;
+}
+function newDetailsWorkbook(records){
+ const worksheet=summarySheetXml(records,{headerLimit:1});
+ const style='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+  '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  '<fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font></fonts>'+
+  '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+
+  '<fill><patternFill patternType="solid"><fgColor rgb="FFF1EDE9"/></patternFill></fill></fills>'+
+  '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+  '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>'+
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+ const files={
+  '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+  '_rels/.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+  'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="當前配貨細節" sheetId="1" r:id="rId1"/></sheets></workbook>',
+  'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+  'xl/worksheets/sheet1.xml':worksheet,
+  'xl/styles.xml':style
+ };
+ return zipRepack(Object.entries(files).map(([name,content])=>{
+  const data=enc.encode(content);return {name,nameBytes:enc.encode(name),data,method:0,csize:data.length,usize:data.length,crc:crc(data)};
+ }));
+}
+function newDownloadDetails(){
+ if(mode!=='new'||step!=='work'||!rows.length){alert('請先匯入新品資料並進入配貨畫面');return}
+ try{
+  const records=newDetailRows();
+  if(records.length!==rows.length+1)throw Error('細節筆數與目前 SKU 數不一致');
+  downloadWorkbook(newDetailsWorkbook(records),'PAZZO_新品_當前配貨細節_'+exportDateYMD()+'.xlsx');
+ }catch(err){alert('細節下載失敗：'+err.message)}
+}
+
 function newWorkbenchRender(){
  if(step!=='work'||mode!=='new')return;
  newEnsureInitial();
@@ -2346,10 +2413,18 @@ function newWorkbenchRender(){
  for(const [,items] of sortedGroups)items.sort((a,b)=>String(a.row.color||'').localeCompare(String(b.row.color||''),'zh-Hant'));
  const activeStores=stores.filter(store=>store!=='大隆'||includeDalong);
  const actions=document.getElementById('workActions');
- if(actions)actions.innerHTML='<button class="primary" onclick="approve()">套用</button>'+
-  '<button onclick="newInitialize()">初始化</button>'+
-  '<button onclick="newUndo()" '+(!newHistory.length?'disabled':'')+'>上一步'+(newHistory.length?'（'+newHistory.length+'）':'')+'</button>'+
-  '<button onclick="setStep(\'home\')">重新匯入</button>';
+ if(actions){
+  actions.style.display='flex';
+  actions.style.alignItems='center';
+  actions.style.flexWrap='wrap';
+  actions.style.gap='8px';
+  actions.innerHTML='<button onclick="setStep(\'home\')">重新匯入</button>'+
+   '<button onclick="newInitialize()">初始化</button>'+
+   '<button onclick="newUndo()" '+(!newHistory.length?'disabled':'')+'>上一步'+(newHistory.length?'（'+newHistory.length+'）':'')+'</button>'+
+   '<span style="flex:1;min-width:12px"></span>'+
+   '<button class="primary" onclick="approve()">套用</button>'+
+   '<button onclick="newDownloadDetails()">細節下載</button>';
+ }
  const controls=document.getElementById('newControls');
  if(controls){
   if(!controls.querySelector('details[data-new-zero]'))controls.innerHTML=newZeroMarkup();
