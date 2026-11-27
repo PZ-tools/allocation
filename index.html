@@ -1156,19 +1156,22 @@ function summarySheetXml(records,opts={}){
    const storeForCell=opts.storeCols!=null&&ci>=opts.storeCols&&ci<opts.storeCols+stores.length?
     stores[ci-opts.storeCols]:opts.storeField!=null&&ri>0?String(r[opts.storeField]||''):'';
    const index=stores.indexOf(storeForCell);
-   const style=index>=0?' s="'+(3+index)+'"':ri===0?' s="1"':ri>0&&ri<headerLimit?' s="2"':'';
+   const style=opts.confirmation&&ri>1&&ci===6?' s="12"':opts.confirmation&&ri>1&&ci===7?' s="13"':
+    index>=0?' s="'+(3+index)+'"':ri===0?' s="1"':ri>0&&ri<headerLimit?' s="2"':'';
    if(typeof v==='number'&&Number.isFinite(v))return '<c r="'+reference+'"'+style+'><v>'+v+'</v></c>';
    return '<c r="'+reference+'"'+style+' t="inlineStr"><is><t xml:space="preserve">'+summaryXmlEscape(v)+'</t></is></c>';
   }).join('');
   return '<row r="'+(ri+1)+'"'+(ri===0?' ht="23" customHeight="1"':'')+'>'+cells+'</row>';
  }).join('');
- const widths=Array.from({length:cols},(_,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+(i===0?24:i===1?20:14)+'" customWidth="1"/>').join('');
+ const widths=Array.from({length:cols},(_,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+(opts.confirmation?[16,12,11,40,21,13,15,15,14,14][i]:(i===0?24:i===1?20:14))+'" customWidth="1"/>').join('');
+ const merges=(opts.merges||[]).map(ref=>'<mergeCell ref="'+ref+'"/>').join('');
  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:'+summaryExcelCol(cols-1)+nameLimit+'"/>'+
   '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'+
-  '<cols>'+widths+'</cols><sheetData>'+cellRows+'</sheetData></worksheet>';
+  '<cols>'+widths+'</cols><sheetData>'+cellRows+'</sheetData>'+
+  (merges?'<mergeCells count="'+opts.merges.length+'">'+merges+'</mergeCells>':'')+'</worksheet>';
 }
-function summaryXlsxBlob(mainRows,detailRows){
+function summaryXlsxBlob(mainRows,detailRows,options={}){
  const entries={
   '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
   '_rels/.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
@@ -1176,8 +1179,18 @@ function summaryXlsxBlob(mainRows,detailRows){
   'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
   'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF302B29"/><name val="Arial"/></font></fonts><fills count="12"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1EDE9"/><bgColor indexed="64"/></patternFill></fill>'+colors.map(c=>'<fill><patternFill patternType="solid"><fgColor rgb="FF'+c.slice(1).toUpperCase()+'"/><bgColor indexed="64"/></patternFill></fill>').join('')+'</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="12"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+colors.map((c,i)=>'<xf numFmtId="0" fontId="0" fillId="'+(i+3)+'" borderId="0" xfId="0" applyFill="1"/>').join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
   'xl/worksheets/sheet1.xml':summarySheetXml(mainRows,{headerLimit:4,storeCols:3}),
-  'xl/worksheets/sheet2.xml':summarySheetXml(detailRows,{storeField:detailRows[0]?.[0]==='門市'?0:2})
+  'xl/worksheets/sheet2.xml':summarySheetXml(detailRows,options.confirmation?{confirmation:true,headerLimit:2,merges:options.merges||[]}:{storeField:detailRows[0]?.[0]==='門市'?0:2})
  };
+ // All generated summary Excel cells are horizontally and vertically centered.
+ let styleXml=entries['xl/styles.xml'];
+ styleXml=styleXml.replace('<fills count="12">','<fills count="14">').replace('</fills>',
+  '<fill><patternFill patternType="solid"><fgColor rgb="FFF4E8DB"/></patternFill></fill>'+
+  '<fill><patternFill patternType="solid"><fgColor rgb="FFD9BA9E"/></patternFill></fill></fills>');
+ styleXml=styleXml.replace('<cellXfs count="12">','<cellXfs count="14">').replace('</cellXfs>',
+  '<xf numFmtId="0" fontId="0" fillId="12" borderId="0" xfId="0" applyFill="1"/>'+
+  '<xf numFmtId="0" fontId="0" fillId="13" borderId="0" xfId="0" applyFill="1"/></cellXfs>');
+ styleXml=styleXml.replace(/<xf([^>]*?)\/>/g,(_,attrs)=>'<xf'+attrs+' applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>');
+ entries['xl/styles.xml']=styleXml;
  const data=Object.entries(entries).map(([name,contents])=>{
   const bytes=enc.encode(contents);
   return {name,nameBytes:enc.encode(name),data:bytes,method:0,csize:bytes.length,usize:bytes.length,crc:crc(bytes)};
@@ -2584,4 +2597,71 @@ approve=function(){
    '<button onclick="copyMissing()">複製未配紀錄</button>';
  }
 };
+
+/* New arrivals: detailed SKU confirmation export with SPU order and color-group availability. */
+function newQuantityConfirmation(){
+ const sorted=rows.map(r=>r).sort((a,b)=>newCompareNineCode(a.spu,b.spu)||
+  String(a.color||'').localeCompare(String(b.color||''),'zh-Hant')||
+  ['XS','S','M','L','XL','XXL','F'].indexOf(String(a.size||'').toUpperCase())-
+  ['XS','S','M','L','XL','XXL','F'].indexOf(String(b.size||'').toUpperCase())||
+  String(a.sku).localeCompare(String(b.sku)));
+ const records=[['貨號','顏色','尺寸','品名','品號','庫存','可叫數','總叫數','配貨數','EC剩餘'],
+  ['合計','','','','',sorted.reduce((t,r)=>t+Number(r.stock||0),0),'',
+   sorted.reduce((t,r)=>t+newDemandTotal(r),0),
+   sorted.reduce((t,r)=>t+newQtyTotal(r),0),
+   sorted.reduce((t,r)=>t+Number(r.stock||0)-newQtyTotal(r),0)]];
+ const merges=[],availableGroup=new Map();
+ for(const r of sorted){
+  const key=r.spu+'|'+String(r.color||'');
+  if(!availableGroup.has(key))availableGroup.set(key,r.availableQty);
+  else if(r.availableQty!=null&&availableGroup.get(key)!=null&&availableGroup.get(key)!==r.availableQty)
+   throw Error('可叫數不一致：'+key);
+  else if(availableGroup.get(key)==null&&r.availableQty!=null)availableGroup.set(key,r.availableQty);
+ }
+ const uniqueAvailability=[...availableGroup.values()].filter(x=>x!=null);
+ if(uniqueAvailability.length)records[1][6]=uniqueAvailability.reduce((a,b)=>a+Number(b),0);
+ let i=0;
+ while(i<sorted.length){
+  const groupStart=i,spu=sorted[i].spu;
+  while(i<sorted.length&&sorted[i].spu===spu)i++;
+  const total=sorted.slice(groupStart,i).reduce((sum,r)=>sum+newDemandTotal(r),0);
+  if(i-groupStart>1){
+   merges.push('A'+(groupStart+3)+':A'+(i+2));
+   merges.push('H'+(groupStart+3)+':H'+(i+2));
+  }
+  let j=groupStart;
+  while(j<i){
+   const start=j,color=String(sorted[j].color||'');
+   while(j<i&&String(sorted[j].color||'')===color)j++;
+   if(j-start>1)merges.push('G'+(start+3)+':G'+(j+2));
+  }
+  for(let k=groupStart;k<i;k++){
+   const r=sorted[k],groupKey=r.spu+'|'+String(r.color||'');
+   const isColorFirst=k===groupStart||String(sorted[k-1].color||'')!==String(r.color||'');
+   records.push([k===groupStart?spu:'',r.color||'',r.size||'',r.name||'',r.sku,Number(r.stock||0),
+     isColorFirst?availableGroup.get(groupKey):'',k===groupStart?total:'',
+     newQtyTotal(r),Number(r.stock||0)-newQtyTotal(r)]);
+  }
+ }
+ return {records,merges};
+}
+const previousDownloadResult20261127=downloadResult;
+downloadResult=function(){
+ if(mode!=='new')return previousDownloadResult20261127();
+ try{
+  if(!rows.length)throw Error('尚無新品配貨資料');
+  const issues=newGridIssues();if(issues.length)throw Error(issues.slice(0,5).join('；'));
+  const totals=stores.map((store,i)=>rows.reduce((sum,r)=>sum+Number(r.qty[i]||0),0));
+  const stockTotal=rows.reduce((sum,r)=>sum+Number(r.stock||0),0);
+  const mainRows=[
+   ['SKU','SPU','庫存',...stores,'庫存剩餘'],
+   ['配貨總數','',stockTotal,...totals,stockTotal-totals.reduce((a,b)=>a+b,0)],
+   ...rows.map(r=>[r.sku,r.spu,Number(r.stock||0),...r.qty.map(x=>Number(x||0)),Number(r.stock||0)-newQtyTotal(r)])
+  ];
+  const confirmation=newQuantityConfirmation();
+  const output='PAZZO_新品_'+exportDateYMD()+'.xlsx';
+  downloadWorkbook(summaryXlsxBlob(mainRows,confirmation.records,{confirmation:true,merges:confirmation.merges}),output);
+ }catch(error){alert('新品配貨總覽 Excel 匯出停止：'+error.message)}
+};
+
 </script></body></html>
