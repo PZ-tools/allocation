@@ -2380,19 +2380,20 @@ function newDetailRows(){
  }
  return records;
 }
-function newDetailsWorkbook(records){
+function newDetailsWorkbook(records,options={}){
  // Only the independent details export gets grouped two-tier headers and store colors.
- const active=stores.filter(store=>store!=='大隆'||includeDalong);
+ const active=options.activeStores||stores.filter(store=>store!=='大隆'||includeDalong);
+ const storeParts=options.storeParts||newStoreParts;
  const metaCount=11,header1=records[0].slice(0,metaCount),header2=Array(metaCount).fill('');
  const groups=[],columnStyles=Array(metaCount).fill(0),merges=[];
  for(let i=0;i<metaCount;i++)merges.push(summaryExcelCol(i)+'1:'+summaryExcelCol(i)+'2');
  let col=metaCount;
  for(const store of active){
-  const parts=newStoreParts(store),start=col;
+  const parts=storeParts(store),start=col;
   header1.push(store,...Array(parts.length-1).fill(''));
   header2.push(...parts);
   const idx=stores.indexOf(store);
-  for(const part of parts){columnStyles.push((part==='倉庫'||part==='陳列')?3+idx*2:2+idx*2);col++}
+  for(const part of parts){columnStyles.push((/倉庫|陳列/.test(part))?3+idx*2:2+idx*2);col++}
   merges.push(summaryExcelCol(start)+'1:'+summaryExcelCol(col-1)+'1');
   groups.push({store,start,end:col-1});
  }
@@ -2490,6 +2491,45 @@ function attachAllocationHelp(){
  button.onclick=showAllocationHelp;
  title.appendChild(button);
 }
+/* Restock details are an independent, pre-approval export with actual named zones. */
+function restockDetailParts(store){return ['需求','實際',...(restockZoneCatalog[store]||[])]}
+function restockDetailRows(){
+ const headers=['貨號','顏色','尺寸','品名','品號','庫存','安全庫存','總需求','配貨數','庫存剩餘','分區狀態'];
+ for(const store of stores)headers.push(...restockDetailParts(store).map(part=>store+'_'+part));
+ const sorted=rows.slice().sort((a,b)=>newCompareNineCode(a.spu,b.spu)||
+  String(a.color||'').localeCompare(String(b.color||''),'zh-Hant')||
+  String(a.size||'').localeCompare(String(b.size||''),'en',{numeric:true}));
+ const records=[headers];
+ for(const row of sorted){
+  const qty=row.qty.reduce((a,b)=>a+Number(b||0),0);
+  const demand=row.demand.reduce((a,b)=>a+Number(b||0),0);
+  let status='已確認';
+  const details=[row.spu||'',row.color||'',row.size||'',row.name||'',row.sku,
+   Number(row.stock||0),Number(saved.restock.safe||0),demand,qty,Number(row.stock||0)-qty,''];
+  for(const store of stores){
+   const index=stores.indexOf(store),parts=restockZoneCatalog[store]||[];
+   const actual=Number(row.qty[index]||0),info=zoneForSKU(row,store);
+   const valid=info.verified&&Object.keys(info.values).every(zone=>parts.includes(zone));
+   if(actual>0&&!valid)status='待確認';
+   details.push(Number(row.demand[index]||0),actual);
+   for(const zone of parts)details.push(actual&&!valid?'待確認':Number(info.values[zone]||0));
+  }
+  details[10]=status;
+  records.push(details);
+ }
+ return records;
+}
+function restockDownloadDetails(){
+ if(mode!=='restock'||step!=='work'||!rows.length){
+  alert('請先匯入補貨資料並進入配貨畫面');return;
+ }
+ try{
+  const records=restockDetailRows();
+  if(records.length!==rows.length+1)throw Error('細節筆數與目前 SKU 數不一致');
+  downloadWorkbook(newDetailsWorkbook(records,{activeStores:stores,storeParts:restockDetailParts}),
+   'PAZZO_補貨_當前配貨細節_'+exportDateYMD()+'.xlsx');
+ }catch(error){alert('補貨細節下載失敗：'+error.message)}
+}
 function alignRestockApplyRight(){
  if(mode!=='restock'||step!=='work')return;
  const actions=document.getElementById('workActions');
@@ -2498,8 +2538,23 @@ function alignRestockApplyRight(){
  actions.style.alignItems='center';
  actions.style.flexWrap='wrap';
  actions.style.gap='8px';
+ let detail=document.getElementById('restockDetailDownload');
+ if(!detail){
+  detail=document.createElement('button');
+  detail.id='restockDetailDownload';
+  detail.type='button';
+  detail.textContent='細節下載';
+  detail.onclick=restockDownloadDetails;
+ }
  const apply=[...actions.querySelectorAll(':scope > button')].find(b=>b.classList.contains('primary'));
- if(apply){apply.style.marginLeft='auto';actions.appendChild(apply)}
+ if(apply){
+  apply.style.marginLeft='0';
+  const spacer=document.getElementById('restockActionSpacer')||document.createElement('span');
+  spacer.id='restockActionSpacer';spacer.style.flex='1';spacer.style.minWidth='12px';
+  actions.appendChild(spacer);
+  actions.appendChild(detail);
+  actions.appendChild(apply);
+ }
 }
 
 function newWorkbenchRender(){
