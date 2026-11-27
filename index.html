@@ -2487,7 +2487,7 @@ function attachRestockContextHelp(){
  const container=document.getElementById('workActions');
  if(!container)return;
  const keys=['reimport','recalculate','restoreSuggestion','apply'];
- container.querySelectorAll('button').forEach((button,i)=>{
+ container.querySelectorAll(':scope > button').forEach((button,i)=>{
   const key=keys[i];if(!key||button.nextElementSibling?.dataset?.helpFor===key)return;
   const shell=document.createElement('span');
   shell.dataset.helpFor=key;
