@@ -2252,7 +2252,9 @@ guideMount();
 function newQtyTotal(row){return row.qty.reduce((sum,x)=>sum+Number(x||0),0)}
 function newVisibleDemand(row,storeIndex){return row.blocked?0:Number(row.demand[storeIndex]||0)}
 function newDemandTotal(row){return row.demand.reduce((sum,x,i)=>sum+(stores[i]==='大隆'&&!includeDalong?0:newVisibleDemand(row,i)),0)}
-function newDarkenHex(hex,amount){const n=parseInt(hex.slice(1),16);return '#'+[16,8,0].map(shift=>Math.max(0,Math.round(((n>>shift)&255)*(1-amount)))).map(n=>n.toString(16).padStart(2,'0')).join('')}
+// Store-specific, hue-preserving darker shades for warehouse/display cells.
+const newStoreZoneColors=['#e7a4ad','#eab38b','#ecd27b','#a6d7ac','#a5c8ed','#c4ade8','#e9ac75','#d5a0c7','#bea69c'];
+function newStoreZoneColor(store){return newStoreZoneColors[stores.indexOf(store)]||'#d1c4b9'}
 function newStoreParts(store){return newZonePairs[store]?.length>1?['需求','實際','倉庫','陳列']:['需求','實際']}
 function newZoneState(row,store){
  const q=Number(row.qty[stores.indexOf(store)]||0),names=newZonePairs[store]||[];
@@ -2299,6 +2301,7 @@ function newSetZone(ri,store,zone,textValue){
  row.zoneManual[store][zone]=value;
  render();
 }
+function newHasStockWarning(){return rows.some(row=>!row.blocked&&Number(row.stock||0)-newQtyTotal(row)<newQtyTotal(row))}
 function newGridIssues(){
  const issues=[];
  for(const row of rows){
@@ -2364,7 +2367,7 @@ function newWorkbenchRender(){
   heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+'</th>').join('')+
   activeStores.map(store=>'<th class="group-head" data-store="'+esc(store)+'" colspan="'+newStoreParts(store).length+'" style="background:'+colors[stores.indexOf(store)]+'">'+esc(store)+'</th>').join('')+
   '</tr><tr>'+activeStores.map(store=>newStoreParts(store).map(label=>
-   '<th class="group-sub" style="background:'+colors[stores.indexOf(store)]+'">'+label+'</th>').join('')).join('')+'</tr>';
+   '<th class="group-sub '+(label==='倉庫'||label==='陳列'?'store-zone-head':'')+'" style="background:'+(label==='倉庫'||label==='陳列'?newStoreZoneColor(store):colors[stores.indexOf(store)])+'">'+label+'</th>').join('')).join('')+'</tr>';
  const input=(value,ri,store,zone)=>'<input class="qty-input" type="number" min="0" step="1" value="'+value+'" onchange="'+(zone?
   'newSetZone('+ri+',\''+store+'\',\''+zone+'\',this.value)':
   'newSetQty('+ri+','+stores.indexOf(store)+',this.value)')+'">';
@@ -2393,7 +2396,7 @@ function newWorkbenchRender(){
    const {row,index}=items[k],allocated=newQtyTotal(row),remaining=Number(row.stock||0)-allocated;
    let cells='';
    if(k===0)cells='<td class="meta-cell sticky-code" rowspan="'+items.length+'"><b>'+esc(code)+'</b>'+(groupBlocked?' ⛔':'')+'</td>';
-   cells+='<td class="small-cell sticky-color">'+esc(row.color)+(remaining<allocated?' ⚠️':'')+'</td>'+
+   cells+='<td class="small-cell sticky-color">'+esc(row.color)+(!row.blocked&&remaining<allocated?' ⚠️':'')+'</td>'+
     '<td class="small-cell sticky-size">'+esc(row.size)+'</td>';
    if(!newMetaCollapsed){
     cells+='<td class="meta-cell name-cell" title="'+esc(row.name)+'">'+esc(row.name)+'</td>'+
@@ -2404,7 +2407,7 @@ function newWorkbenchRender(){
    cells+='<td class="number-cell">'+allocated+'</td>'+
     '<td class="number-cell stock-cell '+(remaining<0?'grid-invalid':'')+'">'+remaining+'</td>';
    for(const store of activeStores){
-    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+';--store-deep:'+newDarkenHex(colors[si],0.30)+'"',qty=Number(row.qty[si]||0),needs=newVisibleDemand(row,si);
+    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+';--store-deep:'+newStoreZoneColor(store)+'"',qty=Number(row.qty[si]||0),needs=newVisibleDemand(row,si);
     cells+='<td class="store-cell" '+bg+'>'+needs+'</td><td class="store-cell" '+bg+'>'+input(qty,index,store,'')+'</td>';
     if(newZonePairs[store].length>1){
      const z=newZoneState(row,store);
@@ -2593,6 +2596,7 @@ render=function(){
 const newWorkbenchOldApprove=approve;
 approve=function(){
  if(mode==='new'){
+  if(newHasStockWarning()){alert('請確認庫存剩餘數');return}
   const issues=newGridIssues();
   if(issues.length){alert('請先完成新品逐筆核對：'+issues.slice(0,4).join('；'));return}
   const lacking=[...new Set(rows.filter(r=>r.blocked&&!zeroReasons[r.spu]).map(r=>r.spu))];
