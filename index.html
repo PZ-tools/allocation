@@ -81,6 +81,14 @@
 /* v0.8.16: preserve confirmed store widths and all three frozen columns. */
 #work.new-workbench .new-meta-toggle{margin:5px 0 8px;display:flex;align-items:center}
 #work.new-workbench .new-meta-toggle button{font-size:12px;padding:6px 10px}
+/* Local, click-to-open contextual help. No impact on the allocation grid. */
+.help-icon{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;min-width:17px;min-height:17px;padding:0;margin-left:4px;border:1px solid #aa9d93;border-radius:50%;color:#695b50;background:#fffaf5;font-size:11px;font-weight:700;line-height:1;vertical-align:middle;cursor:pointer}
+.help-icon:hover,.help-icon:focus-visible{background:#eee4d9;outline-offset:2px}
+.help-dialog{max-width:min(350px,calc(100vw - 32px));border:1px solid #d8c9bb;border-radius:12px;padding:20px 22px;background:#fffaf6;color:#302a25;box-shadow:0 14px 35px #0002}
+.help-dialog::backdrop{background:#0005}
+.help-dialog h3{font-size:16px;margin:0 0 8px}
+.help-dialog p{margin:0 0 16px;line-height:1.7;font-size:14px}
+.help-dialog button{float:right}
 </style></head><body><header><div><h1>趴走．效率UPUPUP</h1><small>本機計算・操作測試版 v0.8.16</small></div><span class="badge">⚠ 測試版｜真實資料請先去識別及確認公司授權</span></header><main>
 <div class="tabs"><button id="modeRestock" onclick="setMode('restock')">① 補貨</button><button id="modeNew" onclick="setMode('new')">② 新品</button><button onclick="setStep('settings')">⚙ 設定</button></div>
 <section id="home" class="card"><h2 id="modeTitle">選擇配貨作業</h2><div class="sub"><b>上傳請移除機密資訊，只留下貨號、檔期、品名、顏色、尺寸、現貨庫存與必要配貨數</b></div><div class="row"><button class="primary" onclick="sample()">使用模擬資料開始</button><button onclick="sampleAllStores()">全九店產檔驗收資料</button><button onclick="downloadTemplate()">下載 CSV 欄位範本</button></div></section>
@@ -97,7 +105,8 @@
 <div class="row"><button class="primary" onclick="copyAllLine()">複製全部門市 LINE 資訊</button><button onclick="renderLineNotices()">依最新配貨重新整理</button></div>
 <textarea id="lineAll" rows="24" style="width:100%;font-family:ui-monospace,monospace;font-size:13px;line-height:1.7;border:1px solid #d8cbc0;border-radius:10px;padding:12px;resize:vertical"></textarea>
 <div id="lineWarning" class="sub" style="display:none"></div></div><div id="exportStatus" class="sub"></div></section>
-<footer><div style="margin-bottom:12px"><strong>新品配貨欄位說明</strong><div style="margin-top:7px;line-height:1.9">可叫數：品牌分配給門市數量<br>總叫貨：SPU叫貨總數量<br>配貨數：SKU叫貨總數量</div></div><div style="margin-bottom:12px"><strong>新品操作說明</strong><div style="margin-top:7px;line-height:1.9">初始化：恢復成最一開始的自動配貨狀態<br>重新匯入：返回資料匯入，可更換需求或庫存檔案<br>細節下載：把當前的配貨細節下載為 Excel 檔</div></div><div>此測試網站程式碼公開；請勿將公司內部 Excel、Google Sheets 憑證、密碼或真實營運資料寫入 GitHub 倉庫。檔案讀取與計算在瀏覽器端執行。</div></footer></main><script>
+<dialog id="contextHelpDialog" class="help-dialog" aria-labelledby="contextHelpTitle" aria-describedby="contextHelpText"><h3 id="contextHelpTitle"></h3><p id="contextHelpText"></p><button type="button" onclick="document.getElementById('contextHelpDialog').close()">關閉</button></dialog>
+<footer><div>此測試網站程式碼公開；請勿將公司內部 Excel、Google Sheets 憑證、密碼或真實營運資料寫入 GitHub 倉庫。檔案讀取與計算在瀏覽器端執行。</div></footer></main><script>
 const stores=['信義','西門','ATT','文心','南西','光復','民族','板橋','大隆'];
 const colors=['#fae0e1','#f9e5d4','#fff5dd','#e5f3e7','#dceafb','#ece3fb','#ffdfc2','#f1d9e7','#e8d8d0'];
 const defaults={restock:{safe:9,threshold:9,priority:['南西','ATT','西門','信義','文心','板橋','民族','光復','大隆']},new:{safe:0,threshold:0,priority:['南西','ATT','西門','信義','文心','板橋','民族','光復','大隆']}};
@@ -2447,6 +2456,47 @@ function newDownloadDetails(){
  }catch(err){alert('細節下載失敗：'+err.message)}
 }
 
+/* Shared inline help used by both new-arrival and restock controls. */
+const contextHelpContent={
+ available:['可叫數','品牌分配給門市數量'],
+ demand:['總叫數','SPU叫貨總數量'],
+ allocated:['配貨數','SKU叫貨總數量'],
+ reimport:['重新匯入','返回資料匯入，可更換需求或庫存檔案'],
+ initialize:['初始化','恢復成最一開始的自動配貨狀態'],
+ undo:['上一步','還原前一次人工修改'],
+ detail:['細節下載','把當前的配貨細節下載為 Excel 檔'],
+ recalculate:['重新計算建議','依目前需求、庫存與配貨優先順序重新計算，會覆蓋人工調整'],
+ restoreSuggestion:['還原建議','恢復最近一次自動計算的配貨數量，並非逐步復原'],
+ apply:['套用','驗證目前配貨數量，確認後進入配貨結果頁']
+};
+function contextHelpIcon(key){
+ if(!contextHelpContent[key])return '';
+ return '<button type="button" class="help-icon" aria-label="說明：'+contextHelpContent[key][0]+'" title="查看說明" onclick="showContextHelp(event,\''+key+'\')">ⓘ</button>';
+}
+function showContextHelp(event,key){
+ if(event){event.preventDefault();event.stopPropagation()}
+ const info=contextHelpContent[key],dialog=document.getElementById('contextHelpDialog');
+ if(!info||!dialog)return;
+ document.getElementById('contextHelpTitle').textContent=info[0];
+ document.getElementById('contextHelpText').textContent=info[1];
+ if(dialog.open)dialog.close();
+ dialog.showModal();
+}
+function attachRestockContextHelp(){
+ if(mode!=='restock'||step!=='work')return;
+ const container=document.getElementById('workActions');
+ if(!container)return;
+ const keys=['reimport','recalculate','restoreSuggestion','apply'];
+ container.querySelectorAll('button').forEach((button,i)=>{
+  const key=keys[i];if(!key||button.nextElementSibling?.dataset?.helpFor===key)return;
+  const shell=document.createElement('span');
+  shell.dataset.helpFor=key;
+  shell.style.display='inline-flex';shell.style.alignItems='center';
+  shell.innerHTML=contextHelpIcon(key);
+  button.after(shell);
+ });
+}
+
 function newWorkbenchRender(){
  if(step!=='work'||mode!=='new')return;
  newEnsureInitial();
@@ -2464,12 +2514,12 @@ function newWorkbenchRender(){
   actions.style.alignItems='center';
   actions.style.flexWrap='wrap';
   actions.style.gap='8px';
-  actions.innerHTML='<button onclick="setStep(\'home\')">重新匯入</button>'+
-   '<button onclick="newInitialize()">初始化</button>'+
-   '<button onclick="newUndo()" '+(!newHistory.length?'disabled':'')+'>上一步'+(newHistory.length?'（'+newHistory.length+'）':'')+'</button>'+
+  actions.innerHTML='<span style="display:inline-flex;align-items:center"><button onclick="setStep(\'home\')">重新匯入</button>'+contextHelpIcon('reimport')+'</span>'+
+   '<span style="display:inline-flex;align-items:center"><button onclick="newInitialize()">初始化</button>'+contextHelpIcon('initialize')+'</span>'+
+   '<span style="display:inline-flex;align-items:center"><button onclick="newUndo()" '+(!newHistory.length?'disabled':'')+'>上一步'+(newHistory.length?'（'+newHistory.length+'）':'')+'</button>'+contextHelpIcon('undo')+'</span>'+
    '<span style="flex:1;min-width:12px"></span>'+
    '<button class="primary" onclick="approve()">套用</button>'+
-   '<button onclick="newDownloadDetails()">細節下載</button>';
+   '<span style="display:inline-flex;align-items:center"><button onclick="newDownloadDetails()">細節下載</button>'+contextHelpIcon('detail')+'</span>';
  }
  const controls=document.getElementById('newControls');
  if(controls){
@@ -2504,7 +2554,7 @@ function newWorkbenchRender(){
  const metaHeads=newMetaCollapsed?[]:['品名','品號','庫存','可叫數','總叫數'];
  const heads=['貨號','顏色','尺寸',...metaHeads,'配貨數','EC剩餘'];
  document.getElementById('thead').innerHTML='<tr>'+
-  heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+'</th>').join('')+
+  heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+(title==='可叫數'?contextHelpIcon('available'):title==='總叫數'?contextHelpIcon('demand'):title==='配貨數'?contextHelpIcon('allocated'):'')+'</th>').join('')+
   activeStores.map(store=>'<th class="group-head" data-store="'+esc(store)+'" colspan="'+newStoreParts(store).length+'" style="background:'+colors[stores.indexOf(store)]+'">'+esc(store)+'</th>').join('')+
   '</tr><tr>'+activeStores.map(store=>newStoreParts(store).map(label=>
    '<th class="group-sub '+(label==='倉庫'||label==='陳列'?'store-zone-head':'')+'" style="background:'+(label==='倉庫'||label==='陳列'?newStoreZoneColor(store):colors[stores.indexOf(store)])+'">'+label+'</th>').join('')).join('')+'</tr>';
@@ -2746,7 +2796,7 @@ render=function(){
   newWorkbenchOldRender();
   document.getElementById('work')?.classList.remove('new-workbench');
   // The collapse control belongs only to the new-arrivals grid.
-  if(mode==='restock')document.getElementById('newMetaToggle')?.remove();
+  if(mode==='restock'){document.getElementById('newMetaToggle')?.remove();attachRestockContextHelp()}
  }
 };
 
