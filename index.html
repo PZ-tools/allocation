@@ -2902,6 +2902,26 @@ function newStoreQuantitySummary(){
 
 const previousDownloadResult20261127=downloadResult;
 downloadResult=function(){
+ if(mode==='restock'){
+  try{
+   if(!rows.length)throw Error('尚無補貨配貨資料');
+   const totals=stores.map((store,i)=>rows.reduce((sum,r)=>sum+Number(r.qty[i]||0),0));
+   // Keep the already approved restock 配貨總覽 first sheet exactly as before.
+   const mainRows=[
+    ['SKU','SPU','庫存',...stores,'庫存剩餘'],
+    ['配貨總數','','',...totals,''],
+    ...rows.map(r=>[r.sku,r.spu,r.stock,...stores.map((store,i)=>Number(r.qty[i]||0)),
+     r.stock-r.qty.reduce((a,b)=>a+Number(b||0),0)])
+   ];
+   const grandTotal=totals.reduce((a,b)=>a+b,0);
+   if(grandTotal!==rows.reduce((a,r)=>a+r.qty.reduce((v,n)=>v+Number(n||0),0),0))
+    throw Error('Excel 件數總合核對失敗');
+   const storeSummary=newStoreQuantitySummary();
+   downloadWorkbook(summaryXlsxBlob(mainRows,storeSummary,{storeSummary:true}),
+    'PAZZO_補貨_'+exportDateYMD()+'.xlsx');
+  }catch(error){alert('補貨總覽 Excel 匯出停止：'+error.message)}
+  return;
+ }
  if(mode!=='new')return previousDownloadResult20261127();
  try{
   if(!rows.length)throw Error('尚無新品配貨資料');
