@@ -95,7 +95,7 @@
 <div class="row"><button class="primary" onclick="copyAllLine()">複製全部門市 LINE 資訊</button><button onclick="renderLineNotices()">依最新配貨重新整理</button></div>
 <textarea id="lineAll" rows="24" style="width:100%;font-family:ui-monospace,monospace;font-size:13px;line-height:1.7;border:1px solid #d8cbc0;border-radius:10px;padding:12px;resize:vertical"></textarea>
 <div id="lineWarning" class="sub" style="display:none"></div></div><div id="exportStatus" class="sub"></div></section>
-<footer>此測試網站程式碼公開；請勿將公司內部 Excel、Google Sheets 憑證、密碼或真實營運資料寫入 GitHub 倉庫。檔案讀取與計算在瀏覽器端執行。</footer></main><script>
+<footer><div style="margin-bottom:12px"><strong>新品配貨欄位說明</strong><div style="margin-top:7px;line-height:1.9">可叫數：品牌分配給門市數量<br>總叫貨：SPU叫貨總數量<br>配貨數：SKU叫貨總數量</div></div><div>此測試網站程式碼公開；請勿將公司內部 Excel、Google Sheets 憑證、密碼或真實營運資料寫入 GitHub 倉庫。檔案讀取與計算在瀏覽器端執行。</div></footer></main><script>
 const stores=['信義','西門','ATT','文心','南西','光復','民族','板橋','大隆'];
 const colors=['#fae0e1','#f9e5d4','#fff5dd','#e5f3e7','#dceafb','#ece3fb','#ffdfc2','#f1d9e7','#e8d8d0'];
 const defaults={restock:{safe:9,threshold:9,priority:['南西','ATT','西門','信義','文心','板橋','民族','光復','大隆']},new:{safe:0,threshold:0,priority:['南西','ATT','西門','信義','文心','板橋','民族','光復','大隆']}};
