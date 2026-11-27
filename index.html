@@ -2745,6 +2745,8 @@ render=function(){
  }else{
   newWorkbenchOldRender();
   document.getElementById('work')?.classList.remove('new-workbench');
+  // The collapse control belongs only to the new-arrivals grid.
+  if(mode==='restock')document.getElementById('newMetaToggle')?.remove();
  }
 };
 
