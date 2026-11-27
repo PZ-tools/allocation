@@ -13,7 +13,7 @@
 #work.new-workbench > .card > .tablebox .number-cell{font-variant-numeric:tabular-nums}
 #work.new-workbench > .card > .tablebox .qty-input{width:65px;min-width:65px;padding:5px 4px;text-align:center}
 #work.new-workbench > .card > .tablebox .store-cell{background:var(--store-color)}
-#work.new-workbench > .card > .tablebox .store-cell.store-zone{background:color-mix(in srgb,var(--store-color) 70%, var(--store-deep) 30%)}
+#work.new-workbench > .card > .tablebox .store-cell.store-zone{background:var(--store-deep)}
 #work.new-workbench > .card > .tablebox .group-total{font-weight:700;background:#f6f1eb}
 #work.new-workbench > .card > .tablebox .grid-invalid{background:#ffe6e1!important}
 #work.new-workbench > .card > .tablebox .grid-warning{background:#fff2d8!important}
@@ -623,6 +623,23 @@ async function outputFromOriginal(file,records,type){
  const dim=doc.getElementsByTagNameNS(ns,'dimension')[0];
  if(dim)dim.setAttribute('ref',(type==='信義'?'A1:P':'A1:D')+(records.length+1));
  xlsxFixExportColumnWidths(doc,type);
+ // Keep all original XLSX template styles, but center their content in both axes.
+ const styleEntry=entries.find(item=>item.name==='xl/styles.xml');
+ if(!styleEntry)throw Error('原始打單範本缺少樣式表，無法確認全部置中');
+ const styleDoc=new DOMParser().parseFromString(dec.decode(await uncompressed(styleEntry)),'application/xml');
+ if(styleDoc.querySelector('parsererror'))throw Error('打單範本樣式 XML 不可讀');
+ const xfs=styleDoc.getElementsByTagNameNS(ns,'cellXfs')[0];
+ if(!xfs)throw Error('打單範本缺少儲存格樣式清單');
+ for(const xf of Array.from(xfs.getElementsByTagNameNS(ns,'xf'))){
+  let alignment=xf.getElementsByTagNameNS(ns,'alignment')[0];
+  if(!alignment){alignment=styleDoc.createElementNS(ns,'alignment');xf.appendChild(alignment)}
+  alignment.setAttribute('horizontal','center');
+  alignment.setAttribute('vertical','center');
+  xf.setAttribute('applyAlignment','1');
+ }
+ const centered=enc.encode(new XMLSerializer().serializeToString(styleDoc));
+ styleEntry.data=centered;styleEntry.method=0;styleEntry.usize=centered.length;
+ styleEntry.csize=centered.length;styleEntry.crc=crc(centered);
  const out=enc.encode(new XMLSerializer().serializeToString(doc));
  target.data=out;target.method=0;target.usize=out.length;target.csize=out.length;target.crc=crc(out);
  return zipRepack(entries);
@@ -2387,7 +2404,7 @@ function newWorkbenchRender(){
    cells+='<td class="number-cell">'+allocated+'</td>'+
     '<td class="number-cell stock-cell '+(remaining<0?'grid-invalid':'')+'">'+remaining+'</td>';
    for(const store of activeStores){
-    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+';--store-deep:'+newDarkenHex(colors[si],0.43)+'"',qty=Number(row.qty[si]||0),needs=newVisibleDemand(row,si);
+    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+';--store-deep:'+newDarkenHex(colors[si],0.30)+'"',qty=Number(row.qty[si]||0),needs=newVisibleDemand(row,si);
     cells+='<td class="store-cell" '+bg+'>'+needs+'</td><td class="store-cell" '+bg+'>'+input(qty,index,store,'')+'</td>';
     if(newZonePairs[store].length>1){
      const z=newZoneState(row,store);
