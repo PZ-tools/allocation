@@ -13,6 +13,7 @@
 #work.new-workbench > .card > .tablebox .number-cell{font-variant-numeric:tabular-nums}
 #work.new-workbench > .card > .tablebox .qty-input{width:65px;min-width:65px;padding:5px 4px;text-align:center}
 #work.new-workbench > .card > .tablebox .store-cell{background:var(--store-color)}
+#work.new-workbench > .card > .tablebox .store-cell.store-zone{background:color-mix(in srgb,var(--store-color) 70%, var(--store-deep) 30%)}
 #work.new-workbench > .card > .tablebox .group-total{font-weight:700;background:#f6f1eb}
 #work.new-workbench > .card > .tablebox .grid-invalid{background:#ffe6e1!important}
 #work.new-workbench > .card > .tablebox .grid-warning{background:#fff2d8!important}
@@ -1234,7 +1235,8 @@ savePriority=saveCommonOrder;
 cap=function(r){
  const stock=Math.max(0,Math.floor(Number(r.stock)||0));
  if(mode==='restock')return xinyiRule==='unrestricted'?stock:Math.max(0,stock-Number(saved.restock.safe||0));
- return skuCap.kind==='percent'?Math.floor(stock*skuCap.value/100):Math.min(stock,skuCap.value);
+ // New arrivals preserve confirmed orders even when EC remaining becomes negative.
+ return Number.MAX_SAFE_INTEGER;
 };
 function xinyiRestockViolation(r){
  if(mode!=='restock'||xinyiRule!=='unrestricted')return false;
@@ -1621,6 +1623,14 @@ function makeImportRows(){
  const t=impTotals();
  if(t.warnings.length)throw Error('請先處理資料異常：'+t.warnings.slice(0,5).join('；')+(t.warnings.length>5?'…':''));
  if(!t.demand.length||!t.stock.length)throw Error('需求及庫存都必須匯入');
+ const availabilityByColor=new Map();
+ if(mode==='new')for(const d of t.demand){
+  if(d.availableQty===null||d.availableQty===undefined)continue;
+  const key=(d.spu||d.sku.slice(0,9))+'|'+String(d.color||'');
+  if(availabilityByColor.has(key)&&availabilityByColor.get(key)!==d.availableQty)
+   throw Error('可叫貨總量資料衝突：'+key);
+  availabilityByColor.set(key,d.availableQty);
+ }
  return [...t.demands].map(([sku,entries])=>{
   const stock=t.stocks.get(sku),meta=t.meta.get(sku);
   if(stock.spu&&meta.spu&&stock.spu!==meta.spu)throw Error('SKU 與 SPU 不一致：'+sku);
@@ -1630,7 +1640,8 @@ function makeImportRows(){
    zoneDemand[r.store]??={};zoneDemand[r.store][r.zone]=(zoneDemand[r.store][r.zone]||0)+r.qty;
   }
   return {sku,spu:stock.spu||meta.spu,stock:stock.stock,demand,qty:[],blocked:false,why:'',
-   period:meta.period||'',name:stock.name||meta.name||'',color:stock.color||meta.color||'',size:stock.size||meta.size||'',zoneDemand};
+   period:meta.period||'',name:stock.name||meta.name||'',color:stock.color||meta.color||'',size:stock.size||meta.size||'',
+   availableQty:availabilityByColor.get((stock.spu||meta.spu)+'|'+String(meta.color||stock.color||''))??null,zoneDemand};
  });
 }
 function downloadImportDemo(kind){
@@ -1853,6 +1864,7 @@ function guideNewDemandTable(data,source){
  const nineCol=column(/^(貨號|9碼貨號|九碼貨號|SPU)$/);
  const periodCol=column(/^檔期$/),nameCol=column(/^(品名|商品名稱)$/);
  const colorCol=column(/^顏色$/),sizeCol=column(/^(尺寸|尺碼|規格)$/);
+ const availabilityCol=column(/^可叫貨總量$/);
  if(barcodeCol<0)throw Error(source+'：無法確認完整13碼品號欄位，停止辨識');
  const entries=[],seen=new Set(),targetPeriod=guided.date.replace(/-/g,'');
  for(let r=header.r+1;r<data.length;r++){
@@ -1863,7 +1875,9 @@ function guideNewDemandTable(data,source){
    throw Error(source+'：第 '+(r+1)+' 列商品檔期與本次日期不同');
   const explicit=nineCol<0?'':guideCode(row[nineCol]);
   const nine=explicit||barcode.slice(0,9);
-  const base={sku:barcode,spu:nine,lookup9:nine,zone:'',
+  const rawAvailable=availabilityCol<0?'':String(row[availabilityCol]??'').trim();
+  if(rawAvailable&&!/^\d+$/.test(rawAvailable))throw Error(source+'：第 '+(r+1)+' 列可叫貨總量不是非負整數');
+  const base={sku:barcode,spu:nine,lookup9:nine,zone:'',availableQty:rawAvailable===''?null:Number(rawAvailable),
    size:sizeCol<0?'':String(row[sizeCol]??'').trim(),
    name:nameCol<0?'':String(row[nameCol]??'').trim(),
    color:colorCol<0?'':String(row[colorCol]??'').trim(),
@@ -2208,6 +2222,7 @@ guideMount();
 function newQtyTotal(row){return row.qty.reduce((sum,x)=>sum+Number(x||0),0)}
 function newVisibleDemand(row,storeIndex){return row.blocked?0:Number(row.demand[storeIndex]||0)}
 function newDemandTotal(row){return row.demand.reduce((sum,x,i)=>sum+(stores[i]==='大隆'&&!includeDalong?0:newVisibleDemand(row,i)),0)}
+function newDarkenHex(hex,amount){const n=parseInt(hex.slice(1),16);return '#'+[16,8,0].map(shift=>Math.max(0,Math.round(((n>>shift)&255)*(1-amount)))).map(n=>n.toString(16).padStart(2,'0')).join('')}
 function newStoreParts(store){return newZonePairs[store]?.length>1?['需求','實際','倉庫','陳列']:['需求','實際']}
 function newZoneState(row,store){
  const q=Number(row.qty[stores.indexOf(store)]||0),names=newZonePairs[store]||[];
@@ -2359,12 +2374,12 @@ function newWorkbenchRender(){
    cells+='<td class="number-cell">'+allocated+'</td>'+
     '<td class="number-cell stock-cell '+(remaining<0?'grid-invalid':'')+'">'+remaining+'</td>';
    for(const store of activeStores){
-    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+'"',qty=Number(row.qty[si]||0),needs=newVisibleDemand(row,si);
+    const si=stores.indexOf(store),bg='style="--store-color:'+colors[si]+';--store-deep:'+newDarkenHex(colors[si],0.43)+'"',qty=Number(row.qty[si]||0),needs=newVisibleDemand(row,si);
     cells+='<td class="store-cell" '+bg+'>'+needs+'</td><td class="store-cell" '+bg+'>'+input(qty,index,store,'')+'</td>';
     if(newZonePairs[store].length>1){
      const z=newZoneState(row,store);
      for(const name of newZonePairs[store]){
-      cells+='<td class="store-cell '+(!z.verified?'grid-warning':'')+'" '+bg+'>'+
+      cells+='<td class="store-cell store-zone '+(!z.verified?'grid-warning':'')+'" '+bg+'>'+
        input(z.values[name]??0,index,store,name)+'</td>';
      }
     }
