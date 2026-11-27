@@ -2380,7 +2380,7 @@ function newWorkbenchRender(){
   colgroup.innerHTML=colWidths.map(width=>'<col style="width:'+width+'px">').join('');
   table.prepend(colgroup);
  }
- const metaHeads=newMetaCollapsed?[]:['品名','品號','庫存','可叫數','總叫貨'];
+ const metaHeads=newMetaCollapsed?[]:['品名','品號','庫存','可叫數','總叫數'];
  const heads=['貨號','顏色','尺寸',...metaHeads,'配貨數','EC剩餘'];
  document.getElementById('thead').innerHTML='<tr>'+
   heads.map((title,i)=>'<th rowspan="2" class="new-head-col '+(i===0?'sticky-code':i===1?'sticky-color':i===2?'sticky-size':'')+'">'+title+'</th>').join('')+
