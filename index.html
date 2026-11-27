@@ -2753,7 +2753,17 @@ function newMissingNotes(){
    const text=allConditions[0].startsWith('reason:')?reason:description(allConditions[0].slice(7));
    if(text)notes.push(code+' '+text);
   }else{
-   for(const part of sets)notes.push(label(code,part.color,part.size)+' '+part.text);
+   // The same size and store condition across colors can share one compact line.
+   const merged=new Map();
+   for(const part of sets){
+    const key=part.size+'|'+part.text;
+    if(!merged.has(key))merged.set(key,{size:part.size,text:part.text,colors:[]});
+    if(part.color&&!merged.get(key).colors.includes(part.color))merged.get(key).colors.push(part.color);
+   }
+   const descriptions=[...merged.values()].map(part=>
+    (part.colors.length?part.colors.join('/'):'')+part.size+'：'+part.text);
+   if(descriptions.length===1)notes.push(code+' '+descriptions[0]);
+   else if(descriptions.length){notes.push(code);for(const line of descriptions)notes.push('  '+line)}
   }
  }
  return notes;
