@@ -2593,6 +2593,70 @@ render=function(){
   document.getElementById('work')?.classList.remove('new-workbench');
  }
 };
+
+/* Compact new-arrival status notes. Use actual SKU allocations for every participating store. */
+function newMissingNotes(){
+ const active=stores.filter(store=>store!=='大隆'||includeDalong);
+ const bySpu=new Map();
+ for(const r of rows){if(!bySpu.has(r.spu))bySpu.set(r.spu,[]);bySpu.get(r.spu).push(r)}
+ const notes=[];
+ const statusKey=r=>active.map(store=>Number(r.qty[stores.indexOf(store)]||0)>0?'1':'0').join('');
+ const description=key=>{
+  const yes=active.filter((_,i)=>key[i]==='1'),no=active.filter((_,i)=>key[i]==='0');
+  if(!no.length)return '';
+  if(!yes.length)return '全門市未進';
+  const only='僅 '+yes.join('/')+' 上架',missing=no.join('/')+' 未進';
+  return yes.length<no.length?only:missing;
+ };
+ const label=(code,color,size)=>code+(color?' '+color:'')+(size||'');
+ for(const [code,items] of [...bySpu.entries()].sort(([a],[b])=>newCompareNineCode(a,b))){
+  const reason=zeroReasons[code]||'';
+  if(items.every(r=>r.blocked)){
+   notes.push(code+(reason?' '+reason:' 全門市未進'));
+   continue;
+  }
+  // Group whole-color rows only when all its sizes have the same condition.
+  const byColor=new Map();
+  for(const r of items){const color=String(r.color||'');if(!byColor.has(color))byColor.set(color,[]);byColor.get(color).push(r)}
+  const sets=[];
+  for(const [color,candidates] of byColor){
+   const conditions=new Map();
+   for(const r of candidates){
+    const key=r.blocked?'reason:'+reason:'status:'+statusKey(r);
+    if(!conditions.has(key))conditions.set(key,[]);
+    conditions.get(key).push(r);
+   }
+   for(const [key,parts] of conditions){
+    if(key.startsWith('reason:')){
+     if(!reason)continue; // Approval already requires a reason for blocked sizes.
+     const size=parts.length===candidates.length?'':parts.map(r=>String(r.size||'')).filter(Boolean).join('/');
+     sets.push({color,size,text:reason,grouped:parts.length===candidates.length});
+     continue;
+    }
+    const text=description(key.slice(7));
+    if(!text)continue;
+    const size=parts.length===candidates.length?'':parts.map(r=>String(r.size||'')).filter(Boolean).join('/');
+    sets.push({color,size,text,grouped:parts.length===candidates.length});
+   }
+  }
+  // If every SKU has exactly one identical status, omit color and size altogether.
+  const allConditions=items.map(r=>r.blocked?'reason:'+reason:'status:'+statusKey(r));
+  if(allConditions.every(x=>x===allConditions[0])){
+   const text=allConditions[0].startsWith('reason:')?reason:description(allConditions[0].slice(7));
+   if(text)notes.push(code+' '+text);
+  }else{
+   for(const part of sets)notes.push(label(code,part.color,part.size)+' '+part.text);
+  }
+ }
+ return notes;
+}
+function newRenderMissingNotes(){
+ const notes=newMissingNotes(),content=notes.join('\\n');
+ document.getElementById('missing').innerHTML=
+  '<textarea id="missingText" style="width:100%;height:150px" readonly>'+esc(content||'無')+'</textarea>'+
+  '<div class="row"><button onclick="copyMissing()">複製未配紀錄</button></div>';
+}
+
 const newWorkbenchOldApprove=approve;
 approve=function(){
  if(mode==='new'){
@@ -2603,20 +2667,7 @@ approve=function(){
   if(lacking.length){alert('歸零品號尚未選擇原因：'+lacking.join('、'));return}
  }
  newWorkbenchOldApprove();
- if(mode==='new'&&step==='result'){
-  const pending=rows.map(row=>{
-   const not=newDemandTotal(row)-newQtyTotal(row);
-   return {code:row.spu,name:row.name,color:row.color,size:row.size,not,done:newQtyTotal(row)};
-  }).filter(x=>x.not>0);
-  const data=[['9碼貨號','品名','顏色','尺寸','未配','已配'],...pending.map(x=>[x.code,x.name,x.color,x.size,x.not,x.done])];
-  const tsv=data.map(r=>r.join('\t')).join('\n');
-  document.getElementById('missing').innerHTML='<h3>未配紀錄（可複製）</h3>'+
-   '<div class="tablebox"><table><thead><tr>'+data[0].map(v=>'<th>'+v+'</th>').join('')+
-   '</tr></thead><tbody>'+pending.map(r=>'<tr><td>'+esc(r.code)+'</td><td>'+esc(r.name)+
-   '</td><td>'+esc(r.color)+'</td><td>'+esc(r.size)+'</td><td>'+r.not+'</td><td>'+r.done+'</td></tr>').join('')+
-   '</tbody></table></div><textarea id="missingText" style="width:100%;height:100px" readonly>'+esc(tsv)+'</textarea>'+
-   '<button onclick="copyMissing()">複製未配紀錄</button>';
- }
+ if(mode==='new'&&step==='result')newRenderMissingNotes();
 };
 
 /* New arrivals: detailed SKU confirmation export with SPU order and color-group availability. */
